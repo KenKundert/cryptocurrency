@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+'''Cryptocurrency
+
+Displays updated summary of cryptocurrency portfolio.
+
+usage:
+    cryptocurrency [options] [<accounts>...]
+
+options:
+    -t, --transactions   show transactions
+'''
+
+import requests
+from inform import cull, display, fatal
+from textwrap import dedent
+from quantiphy import Quantity, UnitConversion
+from avendesora.gpg import PythonFile
+from cryptocurrency import accounts
+from appdirs import user_config_dir
+from shlib import to_path
+from docopt import docopt
+
+Quantity.set_prefs(prec=2)
+TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
+
+# read the command line
+cmdline = docopt(__doc__)
+desired_accounts = cmdline['<accounts>']
+show_transactions = cmdline['--transactions']
+
+# Read the transactions
+settings_dir = user_config_dir('cryptocurrency')
+for filename in TRANSACTIONS_FILENAMES.split():
+    transactions_filepath = to_path(settings_dir, filename)
+    if transactions_filepath.exists():
+        break
+else:
+    fatal('transactions file not found in:', settings_dir)
+transactions = PythonFile(transactions_filepath)
+transactions.initialize()
+transactions.run()
+    # running the transactions file causes accounts to be set as a side effect
+
+proxies = {
+    # I cannot get the socks proxy to work
+    'http': 'socks5://127.0.0.1:9999',
+    'https': 'socks5:/127.0.0.1:9999'
+}
+proxies = None
+
+# download latest asset prices from cryptocompare.com
+currencies = dict(
+    fsyms='BTC,ETH,BCH,ZEC',  # from symbols
+    tsyms='BTC,ETH,USD',      # to symbols
+)
+url_args = '&'.join(f'{k}={v}' for k, v in currencies.items())
+base_url = f'https://min-api.cryptocompare.com/data/pricemulti'
+url = '?'.join([base_url, url_args])
+try:
+    r = requests.get(url, proxies=proxies)
+except Exception as e:
+    # must catch all exceptions as requests.get() can generate a variety based 
+    # on how it fails, and if the exception is not caught the thread dies and 
+    # the prices mysteriously stop updating.
+    pass
+    fatal('cannot access cryptocurrency prices:', str(e))
+
+data = r.json()
+
+btc2usd = UnitConversion(('$', 'USD'), ('Ƀ', 'BTC'), data['BTC']['USD'])
+eth2usd = UnitConversion(('$', 'USD'), ('Ξ', 'ETH'), data['ETH']['USD'])
+bch2usd = UnitConversion(('$', 'USD'), 'BCH',        data['BCH']['USD'])
+zec2usd = UnitConversion(('$', 'USD'), ('ⓩ', 'ZEC'), data['ZEC']['USD'])
+btc2eth = UnitConversion(('Ξ', 'ETH'), ('Ƀ', 'BTC'), data['BTC']['ETH'])
+
+display(dedent(f'''
+    Current Prices:
+            1 BTC = {btc2usd.convert()} or {btc2eth.convert()}
+            1 ETH = {eth2usd.convert()} or {btc2eth.convert(1, 'Ξ', 'Ƀ')}
+            1 BCH = {bch2usd.convert()}
+            1 ZEC = {zec2usd.convert()}
+''').strip())
+
+if not desired_accounts:
+    desired_accounts = accounts.keys()
+for name in desired_accounts:
+    acct = accounts[name]
+    if show_transactions:
+        display()
+        display(f"{name.title()}'s Transactions:")
+        for t in acct.transactions:
+            cost_each = t.tokens.price
+            value = f'{t.tokens} @ {cost_each}' if cost_each else t.tokens
+            cost = t.cost if t.cost else t.tokens.in_dollars()
+            cost = f'({cost})' if cost else None
+            comment = f'-- {t.comment}' if t.comment else None
+            display(*cull([f'    {t.date}:', value, cost, comment]))
+
+    display()
+    display(f"{name.title()}'s Holdings:")
+    for symbol, tokens in acct.totals.items():
+        dollars = tokens.scale('$')
+        tokens = tokens.scale(symbol)
+        percentage = 100 * dollars / acct.total_value()
+        row = f'    {tokens:>9q} = {dollars:<7q} {percentage:.0f}%'
+        display(row)
+    total = acct.total_value()
+    cost = acct.total_cost()
+    if cost:
+        gain = 100*(total-cost)/cost
+        display(f'        Total = {total}  ({gain:.0f}% gain on {cost} investment)')
+    else:
+        display(f'        Total = {total}')
