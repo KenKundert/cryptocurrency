@@ -5,7 +5,7 @@ Cryptocurrency
 | Released: 2017-11-26
 |
 
-Install using:
+Install using::
 
     pip3 install --user --upgrade .
 
