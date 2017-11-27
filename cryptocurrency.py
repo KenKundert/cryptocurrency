@@ -6,7 +6,7 @@ __released__ = '2017-11-26'
 
 
 class Currency:
-    def __init__(self, tokens, price):
+    def __init__(self, tokens, price=0):
         self.tokens = Quantity(tokens, self.UNITS)
         self.price = Quantity(price, '$')
 
@@ -52,30 +52,30 @@ class Account:
         self.cost = 0
 
     class Transaction:
-        def __init__(self, tokens, date, cost, comment):
+        def __init__(self, tokens, date, comment):
             self.tokens = tokens
             self.date = date
-            self.cost = Quantity(cost, '$')
-            if cost and tokens.in_dollars() > cost + 0.005:
-                value = tokens.in_dollars()
-                cost = Quantity(cost, '$')
-                warn(
-                    f'value ({value}) exceeds cost ({cost}).',
-                    culprit=(tokens.name(), date)
-                )
+            self.cost = tokens.in_dollars()
             self.comment = comment
 
         def fee(self):
             return Quantity(self.cost - self.tokens.in_dollars(), '$')
 
-    def transaction(self, tokens, date, cost=0, comment=''):
-        t = self.Transaction(tokens, date, cost, comment)
+    def transaction(self, tokens, date, comment=''):
+        t = self.Transaction(tokens, date, comment)
         self.transactions.append(t)
         kind = tokens.name()
         self.totals[kind] = Quantity(
             float(tokens) + self.totals.get(kind, 0), units=tokens.UNITS
         )
         self.cost += t.cost
+
+    def confirm_balance(self, kind, tokens):
+        actual = self.totals[kind.__name__]
+        expected = Quantity(tokens, kind.UNITS)
+        if not actual.is_close(expected):
+            delta = Quantity(actual - tokens, kind.UNITS)
+            warn(f'expected {expected}, found {actual}, difference {delta}')
 
     def total_value(self):
         return Quantity(
