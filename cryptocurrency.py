@@ -1,7 +1,7 @@
 from quantiphy import Quantity
 from inform import warn
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __released__ = '2017-11-27'
 
 

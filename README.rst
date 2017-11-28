@@ -1,7 +1,7 @@
 Cryptocurrency
 ==============
 
-| Version: 0.0.2
+| Version: 0.0.3
 | Released: 2017-11-27
 |
 
