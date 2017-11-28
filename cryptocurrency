@@ -11,17 +11,19 @@ options:
 '''
 
 import requests
-from inform import cull, display, fatal
+from inform import Color, cull, display, fatal, terminate
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from avendesora.gpg import PythonFile
-from cryptocurrency import accounts
+from cryptocurrency import Currency, accounts
 from appdirs import user_config_dir
 from shlib import to_path
 from docopt import docopt
 
-Quantity.set_prefs(prec=2)
 TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
+Quantity.set_prefs(prec=2)
+credit = Color('green')
+debit = Color('red')
 
 # read the command line
 cmdline = docopt(__doc__)
@@ -64,6 +66,8 @@ except Exception as e:
     # the prices mysteriously stop updating.
     pass
     fatal('cannot access cryptocurrency prices:', str(e))
+except KeyboardInterrupt:
+    terminate()
 
 data = r.json()
 
@@ -89,25 +93,43 @@ for name in desired_accounts:
         display()
         display(f"{name.title()}'s Transactions:")
         for t in acct.transactions:
-            cost_each = t.tokens.price
-            value = f'{t.tokens} @ {cost_each}' if cost_each else t.tokens
+            price = t.tokens.price
+            value = f'{t.tokens} @ {price}' if price else str(t.tokens)
+            if value[0] == '-':
+                value = value[1:]
+                ttype = 'debit'
+                color = debit
+            else:
+                ttype = 'credit'
+                color = credit
             cost = t.cost if t.cost else t.tokens.in_dollars()
             cost = f'({cost})' if cost else None
             comment = f'-- {t.comment}' if t.comment else None
-            display(*cull([f'    {t.date}:', value, cost, comment]))
+            prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
+            display(color(*cull([prefix, value, cost, comment])))
 
     display()
     display(f"{name.title()}'s Holdings:")
-    for symbol, tokens in acct.totals.items():
-        dollars = tokens.scale('$')
-        tokens = tokens.scale(symbol)
-        percentage = 100 * dollars / acct.total_value()
-        row = f'    {tokens:>9q} = {dollars:<7q} {percentage:.0f}%'
-        display(row)
+    for symbol in Currency.names():
+        if symbol in acct.totals:
+            tokens = acct.totals[symbol]
+            value = tokens.scale('$')
+            tokens = tokens.scale(symbol)
+            percentage = 100 * value / acct.total_value()
+            row = f'{tokens:>9q} = {value:<7q} {percentage:.0f}%'
+            if symbol in acct.costs:
+                cost = acct.costs[symbol]
+                avg_cost = Quantity(cost/tokens, '$')
+                price = Quantity(1, symbol).scale('$')
+                extra = [f'average cost = {avg_cost}']
+                if avg_cost:
+                    gain = 100*(price - avg_cost)/avg_cost
+                    extra += [f'gain = {gain:.0f}%']
+            display(f"    {row:25s}    {', '.join(extra)}")
     total = acct.total_value()
     cost = acct.total_cost()
     if cost:
         gain = 100*(total-cost)/cost
-        display(f'        Total = {total}  ({gain:.0f}% gain on {cost} investment)')
+        display(f'        Total = {total:<15}  {gain:.0f}% gain on {cost} investment')
     else:
         display(f'        Total = {total}')

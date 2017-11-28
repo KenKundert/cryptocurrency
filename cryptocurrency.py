@@ -26,13 +26,20 @@ class Currency:
     def __float__(self):
         return float(self.tokens)
 
+    @classmethod
+    def names(cls):
+        for s in cls.__subclasses__():
+            yield s.__name__
+
 
 class BTC(Currency):
-    UNITS = 'Ƀ'
+    #UNITS = 'Ƀ'
+    UNITS = 'BTC'
     total = 0
 
 class ETH(Currency):
-    UNITS = 'Ξ'
+    #UNITS = 'Ξ'
+    UNITS = 'ETH'
     total = 0
 
 class BCH(Currency):
@@ -49,7 +56,7 @@ class Account:
         self.transactions = []
         self.totals = {}
         accounts[owner] = self
-        self.cost = 0
+        self.costs = {}
 
     class Transaction:
         def __init__(self, tokens, date, comment):
@@ -61,14 +68,16 @@ class Account:
         def fee(self):
             return Quantity(self.cost - self.tokens.in_dollars(), '$')
 
-    def transaction(self, tokens, date, comment=''):
+    def transaction(self, tokens, date=None, comment=''):
         t = self.Transaction(tokens, date, comment)
         self.transactions.append(t)
         kind = tokens.name()
         self.totals[kind] = Quantity(
             float(tokens) + self.totals.get(kind, 0), units=tokens.UNITS
         )
-        self.cost += t.cost
+        self.costs[kind] = Quantity(
+            t.cost + self.costs.get(kind, 0), units='$'
+        )
 
     def confirm_balance(self, kind, tokens):
         actual = self.totals[kind.__name__]
@@ -83,6 +92,4 @@ class Account:
         )
 
     def total_cost(self):
-        return Quantity(self.cost, '$')
-
-
+        return Quantity(sum(self.costs.values()), '$')
