@@ -67,4 +67,4 @@ of the accounts individually or as a group. For example:
     cryptocurrency -t hermes persephone
                          -- same with transactions
 
-    cryptocurrency -p    -- show current prices for currencies along with summary
+    cryptocurrency -p    -- show current prices rather than holdings

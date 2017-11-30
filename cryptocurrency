@@ -12,7 +12,7 @@ options:
 '''
 
 import requests
-from inform import Color, cull, display, fatal, terminate
+from inform import Color, cull, display, fatal, done
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from avendesora.gpg import PythonFile
@@ -68,7 +68,7 @@ except Exception as e:
     pass
     fatal('cannot access cryptocurrency prices:', str(e))
 except KeyboardInterrupt:
-    terminate()
+    done()
 
 data = r.json()
 
@@ -76,22 +76,31 @@ data = r.json()
 BTC.converter(('$', 'USD'), data)
 BTC.converter(('Ξ', 'ETH'), data)
 ETH.converter(('$', 'USD'), data)
+ETH.converter(('Ƀ', 'BTC'), data)
 BCH.converter(('$', 'USD'), data)
+BCH.converter(('Ƀ', 'BTC'), data)
+BCH.converter(('Ξ', 'ETH'), data)
 ZEC.converter(('$', 'USD'), data)
+ZEC.converter(('Ƀ', 'BTC'), data)
+ZEC.converter(('Ξ', 'ETH'), data)
 EOS.converter(('$', 'USD'), data)
+EOS.converter(('Ƀ', 'BTC'), data)
+EOS.converter(('Ξ', 'ETH'), data)
 
 if cmdline['--prices']:
     display(dedent(f'''
         Current Prices:
-                1 BTC = {BTC.one:q$} or {BTC.one:7qΞ}
-                1 ETH = {ETH.one:q$} or {ETH.one:7qɃ}
-                1 BCH = {BCH.one:q$}
-                1 ZEC = {ZEC.one:q$}
-                1 EOS = {EOS.one:q$}
+                {BTC.one} = {BTC.one:<7q$} {BTC.one:<7qɃ} {BTC.one:qΞ}
+                {ETH.one} = {ETH.one:<7q$} {ETH.one:<7qɃ} {ETH.one:qΞ}
+                {BCH.one} = {BCH.one:<7q$} {BCH.one:<7qɃ} {BCH.one:qΞ}
+                {ZEC.one} = {ZEC.one:<7q$} {ZEC.one:<7qɃ} {ZEC.one:qΞ}
+                {EOS.one} = {EOS.one:<7q$} {EOS.one:<7qɃ} {EOS.one:qΞ}
     ''').strip())
+    done()
 
 if not desired_accounts:
     desired_accounts = [n for n in accounts.keys() if accounts[n].default]
+holdings = []
 for name in desired_accounts:
     acct = accounts[name]
     if show_transactions:
@@ -113,8 +122,7 @@ for name in desired_accounts:
             prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
             display(color(*cull([prefix, value, cost, comment])))
 
-    display()
-    display(f"{name.title()}'s Holdings:")
+    lines = [f"{name.title()}'s Holdings:"]
     for symbol in Currency.names():
         if symbol in acct.totals:
             tokens = acct.totals[symbol]
@@ -126,15 +134,21 @@ for name in desired_accounts:
                 cost = acct.costs[symbol]
                 avg_cost = Quantity(cost/tokens, '$')
                 price = Quantity(1, symbol).scale('$')
-                extra = [f'average cost = {avg_cost}']
+                extra = [f'cost = {avg_cost} each', f'price = {price}']
                 if avg_cost:
                     gain = 100*(price - avg_cost)/avg_cost
                     extra += [f'gain = {gain:.0f}%']
-            display(f"    {row:25s}    {', '.join(extra)}")
+            lines.append(f"    {row:25s}  {', '.join(extra)}")
+
     total = acct.total_value()
     cost = acct.total_cost()
     if cost:
         gain = 100*(total-cost)/cost
-        display(f'        Total = {total:<15}  {gain:.0f}% gain on {cost} investment')
+        lines.append(
+            f'        Total = {total:<13}  {gain:.0f}% gain on {cost} investment'
+        )
     else:
-        display(f'        Total = {total}')
+        lines.append(f'        Total = {total}')
+    holdings.append('\n'.join(lines))
+
+display('\n\n'.join(holdings))
