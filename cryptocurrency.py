@@ -1,4 +1,4 @@
-from quantiphy import Quantity
+from quantiphy import Quantity, UnitConversion
 from inform import warn
 
 __version__ = '0.0.3'
@@ -27,32 +27,53 @@ class Currency:
         return float(self.tokens)
 
     @classmethod
+    def converter(cls, to, data):
+        return UnitConversion(to, (cls.SYMBOL, cls.UNITS), data[cls.UNITS][to[-1]])
+
+    @classmethod
     def names(cls):
         for s in cls.__subclasses__():
             yield s.__name__
 
 
 class BTC(Currency):
-    #UNITS = 'Ƀ'
     UNITS = 'BTC'
-    total = 0
+    SYMBOL = 'Ƀ'
+    one = Quantity(1, UNITS)
 
 class ETH(Currency):
-    #UNITS = 'Ξ'
     UNITS = 'ETH'
-    total = 0
+    SYMBOL = 'Ξ'
+    one = Quantity(1, UNITS)
 
 class BCH(Currency):
     UNITS = 'BCH'
-    total = 0
+    SYMBOL = '฿'
+    one = Quantity(1, UNITS)
 
 class ZEC(Currency):
     UNITS = 'ZEC'
+    SYMBOL = 'ⓩ'
+    one = Quantity(1, UNITS)
+
+
+class EOS(Currency):
+    UNITS = 'EOS'
+    SYMBOL = 'Ȅ'
+    one = Quantity(1, UNITS)
+
+    @classmethod
+    def converter(cls, to, data):
+        # cannot convert this to '$' directly using cryptocompare.
+        # instead, use ETH as intermediary
+        conversion = data[cls.UNITS]['ETH'] * data['ETH'][to[-1]]
+        return UnitConversion(to, (cls.SYMBOL, cls.UNITS), conversion)
 
 accounts = {}
 class Account:
-    def __init__(self, owner):
+    def __init__(self, owner, default=True):
         self.owner = owner
+        self.default = default
         self.transactions = []
         self.totals = {}
         accounts[owner] = self

@@ -7,6 +7,7 @@ usage:
     cryptocurrency [options] [<accounts>...]
 
 options:
+    -p, --prices         show prices
     -t, --transactions   show transactions
 '''
 
@@ -15,7 +16,7 @@ from inform import Color, cull, display, fatal, terminate
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from avendesora.gpg import PythonFile
-from cryptocurrency import Currency, accounts
+from cryptocurrency import Currency, BTC, ETH, BCH, ZEC, EOS, accounts
 from appdirs import user_config_dir
 from shlib import to_path
 from docopt import docopt
@@ -52,8 +53,8 @@ proxies = None
 
 # download latest asset prices from cryptocompare.com
 currencies = dict(
-    fsyms='BTC,ETH,BCH,ZEC',  # from symbols
-    tsyms='BTC,ETH,USD',      # to symbols
+    fsyms=','.join(Currency.names()),  # from symbols
+    tsyms='BTC,ETH,USD',               # to symbols
 )
 url_args = '&'.join(f'{k}={v}' for k, v in currencies.items())
 base_url = f'https://min-api.cryptocompare.com/data/pricemulti'
@@ -71,22 +72,26 @@ except KeyboardInterrupt:
 
 data = r.json()
 
-btc2usd = UnitConversion(('$', 'USD'), ('Ƀ', 'BTC'), data['BTC']['USD'])
-eth2usd = UnitConversion(('$', 'USD'), ('Ξ', 'ETH'), data['ETH']['USD'])
-bch2usd = UnitConversion(('$', 'USD'), 'BCH',        data['BCH']['USD'])
-zec2usd = UnitConversion(('$', 'USD'), ('ⓩ', 'ZEC'), data['ZEC']['USD'])
-btc2eth = UnitConversion(('Ξ', 'ETH'), ('Ƀ', 'BTC'), data['BTC']['ETH'])
+# Create unit conversions
+BTC.converter(('$', 'USD'), data)
+BTC.converter(('Ξ', 'ETH'), data)
+ETH.converter(('$', 'USD'), data)
+BCH.converter(('$', 'USD'), data)
+ZEC.converter(('$', 'USD'), data)
+EOS.converter(('$', 'USD'), data)
 
-display(dedent(f'''
-    Current Prices:
-            1 BTC = {btc2usd.convert()} or {btc2eth.convert()}
-            1 ETH = {eth2usd.convert()} or {btc2eth.convert(1, 'Ξ', 'Ƀ')}
-            1 BCH = {bch2usd.convert()}
-            1 ZEC = {zec2usd.convert()}
-''').strip())
+if cmdline['--prices']:
+    display(dedent(f'''
+        Current Prices:
+                1 BTC = {BTC.one:q$} or {BTC.one:7qΞ}
+                1 ETH = {ETH.one:q$} or {ETH.one:7qɃ}
+                1 BCH = {BCH.one:q$}
+                1 ZEC = {ZEC.one:q$}
+                1 EOS = {EOS.one:q$}
+    ''').strip())
 
 if not desired_accounts:
-    desired_accounts = accounts.keys()
+    desired_accounts = [n for n in accounts.keys() if accounts[n].default]
 for name in desired_accounts:
     acct = accounts[name]
     if show_transactions:

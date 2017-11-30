@@ -23,8 +23,8 @@ example of a transactions file::
     from cryptocurrency import Account, BTC, ETH, BCH, ZEC
 
     zeus = Account('zeus')
-    hermes = Account('hermes')
-    persephone = Account('persephone')
+    hermes = Account('hermes', False)
+    persephone = Account('persephone', False)
 
     zeus.transaction(      BTC(5, 120),  '130905', 'initial purchase (coinbase)')
     zeus.transaction(      BCH(5),       '170801', 'fork of bitcoin')
@@ -41,6 +41,11 @@ example of a transactions file::
     persephone.transaction(ETH(1),       '171123', 'Gift from Zeus')
     zeus.transaction(      BCH(0.0005),  '170801', 'transaction fee')
 
+Use *Account* to create an account that can hold a sequence of transactions.  
+*Account* take an optional boolean second argument. It indicates whether the 
+account should be included in the collection accounts that are displayed by 
+default.
+
 The first argument of transaction is the token involved in the transaction. For 
 example, 'ETH(2, 400)', which signifies that 2 ether tokens were acquired for 
 a cost of $400 each. Leave the cost out if it is a transfer rather than 
@@ -54,12 +59,12 @@ accounts.
 When running the cryptocurrency program, you can request information about each 
 of the accounts individually or as a group. For example:
 
-    cryptocurrency       -- show summary of all accounts without transactions
-    cryptocurrency -t    -- show summary of all accounts with transactions
+    cryptocurrency       -- show summary of default accounts without transactions
+    cryptocurrency -t    -- show summary of default accounts with transactions
     cryptocurrency zeus  -- show summary of zeus account without transactions
     cryptocurrency hermes persephone
                          -- show summary of hermes and persephone accounts
     cryptocurrency -t hermes persephone
                          -- same with transactions
 
-   
+    cryptocurrency -p    -- show current prices for currencies along with summary
