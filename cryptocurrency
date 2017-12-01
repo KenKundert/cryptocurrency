@@ -132,7 +132,8 @@ for name in desired_accounts:
             row = f'{tokens:>9q} = {value:<7q} {percentage:.0f}%'
             if symbol in acct.costs:
                 cost = acct.costs[symbol]
-                avg_cost = Quantity(cost/tokens, '$')
+                purchased = acct.purchased[symbol]
+                avg_cost = Quantity(cost/purchased, '$')
                 price = Quantity(1, symbol).scale('$')
                 extra = [f'cost = {avg_cost} each', f'price = {price}']
                 if avg_cost:

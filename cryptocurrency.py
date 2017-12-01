@@ -75,9 +75,10 @@ class Account:
         self.owner = owner
         self.default = default
         self.transactions = []
-        self.totals = {}
         accounts[owner] = self
-        self.costs = {}
+        self.totals = {}     # total value in dollars by token
+        self.costs = {}      # total cost in dollars by token
+        self.purchased = {}  # number of tokens actually purchased by token
 
     class Transaction:
         def __init__(self, tokens, date, comment):
@@ -93,12 +94,15 @@ class Account:
         t = self.Transaction(tokens, date, comment)
         self.transactions.append(t)
         kind = tokens.name()
+        num_tokens = float(tokens)
         self.totals[kind] = Quantity(
-            float(tokens) + self.totals.get(kind, 0), units=tokens.UNITS
+            num_tokens + self.totals.get(kind, 0), units=tokens.UNITS
         )
         self.costs[kind] = Quantity(
             t.cost + self.costs.get(kind, 0), units='$'
         )
+        if t.cost > 0:
+            self.purchased[kind] = num_tokens + self.purchased.get(kind, 0)
 
     def confirm_balance(self, kind, tokens):
         actual = self.totals[kind.__name__]
@@ -108,9 +112,11 @@ class Account:
             warn(f'expected {expected}, found {actual}, difference {delta}')
 
     def total_value(self):
+        "Total value of current holdings in dollars."
         return Quantity(
             sum(token.scale('$') for token in self.totals.values()), '$'
         )
 
     def total_cost(self):
+        "Total cost of tokens purchased in dollars."
         return Quantity(sum(self.costs.values()), '$')
