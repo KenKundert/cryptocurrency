@@ -35,6 +35,11 @@ class Currency:
         for s in cls.__subclasses__():
             yield s.__name__
 
+    @staticmethod
+    def currency(name):
+        for s in Currency.__subclasses__():
+            if s.__name__ == name:
+                return Quantity(tokens, s.UNITS)
 
 class BTC(Currency):
     UNITS = 'BTC'
@@ -102,7 +107,9 @@ class Account:
             t.cost + self.costs.get(kind, 0), units='$'
         )
         if t.cost > 0:
-            self.purchased[kind] = num_tokens + self.purchased.get(kind, 0)
+            self.purchased[kind] = Quantity(
+                num_tokens + self.purchased.get(kind, 0), tokens.UNITS
+            )
 
     def confirm_balance(self, kind, tokens):
         actual = self.totals[kind.__name__]

@@ -135,10 +135,13 @@ for name in desired_accounts:
                 purchased = acct.purchased[symbol]
                 avg_cost = Quantity(cost/purchased, '$')
                 price = Quantity(1, symbol).scale('$')
-                extra = [f'cost = {avg_cost} each', f'price = {price}']
+                extra = [
+                    f'price={price} per {purchased:u}',
+                    f'cost={avg_cost} for {purchased}',
+                ]
                 if avg_cost:
                     gain = 100*(price - avg_cost)/avg_cost
-                    extra += [f'gain = {gain:.0f}%']
+                    extra += [f'gain={gain:.0f}%']
             lines.append(f"    {row:25s}  {', '.join(extra)}")
 
     total = acct.total_value()
