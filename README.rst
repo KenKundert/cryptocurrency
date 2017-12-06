@@ -1,8 +1,8 @@
 Cryptocurrency
 ==============
 
-| Version: 0.0.7
-| Released: 2017-12-01
+| Version: 0.0.8
+| Released: 2017-12-05
 |
 
 Install using::
