@@ -1,0 +1,19 @@
+Override: USD = 10000.0*BTC
+Override: USD = 100.0*ETH
+Override: USD = 1000.0*BCH
+
+Zeus's Holdings:
+        6 BTC = $60k    89%    price=$10k per BTC      cost=$2.68k for 10 BTC      gain=273%
+     26.2 ETH = $2.62k  4%     price=$100 per ETH
+        5 BCH = $5k     7%     price=$1k per BCH
+        Total = $67.6k         152% gain on $26.8k investment
+
+Hermes's Holdings:
+        1 BTC = $10k    99%    price=$10k per BTC
+        1 ETH = $100    1%     price=$100 per ETH
+        Total = $10.1k
+
+Persephone's Holdings:
+        1 BTC = $10k    99%    price=$10k per BTC
+        1 ETH = $100    1%     price=$100 per ETH
+        Total = $10.1k

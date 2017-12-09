@@ -1,0 +1,6 @@
+#!/bin/csh -f
+
+cd tests
+foreach t (./test[0-9])
+    $t
+end

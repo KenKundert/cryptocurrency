@@ -1,0 +1,20 @@
+from cryptocurrency import Account, BTC, ETH, BCH, ZEC
+
+zeus = Account('zeus')
+hermes = Account('hermes', False)
+persephone = Account('persephone', False)
+
+zeus.transaction(      BTC(5, 120),  '130905', 'initial purchase (coinbase)')
+zeus.transaction(      BCH(5),       '170801', 'fork of bitcoin')
+zeus.transaction(      BTC(-2),      '170917', 'convert to ether')
+zeus.transaction(      ETH(28.2276), '170917', 'convert from bitcoin')
+zeus.transaction(      BTC(-1),      '170930', 'Gift to Hermes')
+hermes.transaction(    BTC(1),       '170930', 'Gift from Zeus')
+zeus.transaction(      BTC(-1),      '170930', 'Gift to Persephone')
+persephone.transaction(BTC(1),       '170930', 'Gift from Zeus')
+zeus.transaction(      BTC(5, 5240), '171012', 'purchase (GDAX)')
+zeus.transaction(      ETH(-1),      '171123', 'Gift to Hermes')
+hermes.transaction(    ETH(1),       '171123', 'Gift from Zeus')
+zeus.transaction(      ETH(-1),      '171123', 'Gift to Persephone')
+persephone.transaction(ETH(1),       '171123', 'Gift from Zeus')
+zeus.transaction(      BCH(0.0005),  '170801', 'transaction fee')

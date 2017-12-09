@@ -1,11 +1,7 @@
-#!/bin/csh -f
+#!/usr/bin/env bash
 
 set nonomatch
 
 # the rest is common to all python directories
-rm -f *.pyc *.pyo .test*.sum expected result install.out
+rm -f *.pyc *.pyo .test*.sum expected result install.out test*.out
 rm -rf build *.egg-info dist __pycache__ .coverage .coverage-html htmlcov
-
-if (-e tests/clean) then
-    (cd tests; ./clean)
-endif

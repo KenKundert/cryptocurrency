@@ -7,8 +7,9 @@ usage:
     cryptocurrency [options] [<accounts>...]
 
 options:
-    -p, --prices         show prices
-    -t, --transactions   show transactions
+    -c <dir>, --config-dir  <dir>    directory that holds transactions file
+    -p, --prices                     show prices rather than portfolio
+    -t, --transactions               show transactions with portfolio
 
 You can also override the current price of cryptocurrencies to examine what-if 
 scenarios.  Any account specified that contains an '=' is taken to be an 
@@ -39,7 +40,9 @@ desired_accounts = cmdline['<accounts>']
 show_transactions = cmdline['--transactions']
 
 # Read the transactions
-settings_dir = user_config_dir('cryptocurrency')
+settings_dir = cmdline['--config-dir']
+if not settings_dir:
+    settings_dir = user_config_dir('cryptocurrency')
 for filename in TRANSACTIONS_FILENAMES.split():
     transactions_filepath = to_path(settings_dir, filename)
     if transactions_filepath.exists():

@@ -1,0 +1,10 @@
+#!/bin/csh -f
+
+../cryptocurrency --config-dir test1_config BTC=10k ETH=100 BCH=1k zeus hermes persephone > test1.out
+
+cmp test1.expected test1.out
+if ($status) then
+    vdiff test1.out test1.expected
+else
+    echo test1 passed
+endif
