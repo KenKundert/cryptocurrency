@@ -9,10 +9,17 @@ usage:
 options:
     -p, --prices         show prices
     -t, --transactions   show transactions
+
+You can also override the current price of cryptocurrencies to examine what-if 
+scenarios.  Any account specified that contains an '=' is taken to be an 
+override, and must be specified as a name=value pair, where name is the name of 
+the currency and value is its value in US dollars.  For example:
+
+    cryptocurrency BTC=100k
 '''
 
 import requests
-from inform import Color, cull, display, fatal, done
+from inform import Color, cull, display, done, error, fatal
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from avendesora.gpg import PythonFile
@@ -70,7 +77,10 @@ except Exception as e:
 except KeyboardInterrupt:
     done()
 
-data = r.json()
+try:
+    data = r.json()
+except:
+    fatal('cryptocurrency price download was garbled.')
 
 # Create unit conversions
 BTC.converter(('$', 'USD'), data)
@@ -98,11 +108,30 @@ if cmdline['--prices']:
     ''').strip())
     done()
 
+# process the specified accounts, some of which may actually be overrides
+overrides = [n for n in desired_accounts if '=' in n]
+desired_accounts = [n for n in desired_accounts if '=' not in n]
 if not desired_accounts:
     desired_accounts = [n for n in accounts.keys() if accounts[n].default]
+
+# implement price overrides
+for override in overrides:
+    try:
+        n, v = override.split('=')
+        v = Quantity(v, '$')
+        display('Override:', UnitConversion(('USD', v.units), n, slope=v.real))
+    except ValueError:
+        fatal('garbled override, expected name=value.', culprit=override)
+if overrides:
+    display()
+
 holdings = []
 for name in desired_accounts:
-    acct = accounts[name]
+    try:
+        acct = accounts[name]
+    except KeyError:
+        error('unknown account.', culprit=name)
+        continue
     if show_transactions:
         display()
         display(f"{name.title()}'s Transactions:")
@@ -130,15 +159,13 @@ for name in desired_accounts:
             tokens = tokens.scale(symbol)
             percentage = 100 * value / acct.total_value()
             row = f'{tokens:>9q} = {value:<7q} {percentage:.0f}%'
-            if symbol in acct.costs:
+            price = Quantity(1, symbol).scale('$')
+            extra = ['{:23s}'.format(f'price={price} per {symbol}')]
+            if symbol in acct.purchased:
                 cost = acct.costs[symbol]
                 purchased = acct.purchased[symbol]
                 avg_cost = Quantity(cost/purchased, '$')
-                price = Quantity(1, symbol).scale('$')
-                extra = [
-                    '{:23s}'.format(f'price={price} per {purchased:u}'),
-                    '{:27s}'.format(f'cost={avg_cost} for {purchased}'),
-                ]
+                extra += ['{:27s}'.format(f'cost={avg_cost} for {purchased}')]
                 if avg_cost:
                     gain = 100*(price - avg_cost)/avg_cost
                     extra += [f'gain={gain:.0f}%']
