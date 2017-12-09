@@ -57,7 +57,7 @@ Hermes, and Persephone. Once defined, transactions are associated with the three
 accounts.
 
 When running the cryptocurrency program, you can request information about each 
-of the accounts individually or as a group. For example:
+of the accounts individually or as a group. For example::
 
     cryptocurrency       -- show summary of default accounts without transactions
     cryptocurrency -t    -- show summary of default accounts with transactions
@@ -68,3 +68,12 @@ of the accounts individually or as a group. For example:
                          -- same with transactions
 
     cryptocurrency -p    -- show current prices rather than holdings
+
+You can also override the current price of cryptocurrencies to examine what-if 
+scenarios.  Any account specified that contains an '=' is taken to be an 
+override rather than an account name, and must be specified as a name=value 
+pair, where name is the name of the currency and value is its value in US 
+dollars.  For example::
+
+    cryptocurrency BTC=100k
+    cryptocurrency BTC=100k ETH=5k
