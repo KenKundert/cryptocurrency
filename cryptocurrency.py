@@ -56,11 +56,15 @@ class BCH(Currency):
     SYMBOL = '฿'
     one = Quantity(1, UNITS)
 
+class BTG(Currency):
+    UNITS = 'BTG'
+    SYMBOL = '฿'
+    one = Quantity(1, UNITS)
+
 class ZEC(Currency):
     UNITS = 'ZEC'
     SYMBOL = 'ⓩ'
     one = Quantity(1, UNITS)
-
 
 class EOS(Currency):
     UNITS = 'EOS'
@@ -73,6 +77,11 @@ class EOS(Currency):
         # instead, use ETH as intermediary
         conversion = data[cls.UNITS]['ETH'] * data['ETH'][to[-1]]
         return UnitConversion(to, (cls.SYMBOL, cls.UNITS), conversion)
+
+class IOT(Currency):
+    UNITS = 'IOT'
+    SYMBOL = 'ι'
+    one = Quantity(1, UNITS)
 
 accounts = {}
 class Account:

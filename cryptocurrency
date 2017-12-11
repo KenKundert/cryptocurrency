@@ -24,7 +24,9 @@ from inform import Color, cull, display, done, error, fatal
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from avendesora.gpg import PythonFile
-from cryptocurrency import Currency, BTC, ETH, BCH, ZEC, EOS, accounts
+from cryptocurrency import (
+    Currency, BTC, ETH, BCH, BTG, ZEC, EOS, IOT, accounts
+)
 from appdirs import user_config_dir
 from shlib import to_path
 from docopt import docopt
@@ -93,12 +95,18 @@ ETH.converter(('Ƀ', 'BTC'), data)
 BCH.converter(('$', 'USD'), data)
 BCH.converter(('Ƀ', 'BTC'), data)
 BCH.converter(('Ξ', 'ETH'), data)
+BTG.converter(('$', 'USD'), data)
+BTG.converter(('Ƀ', 'BTC'), data)
+BTG.converter(('Ξ', 'ETH'), data)
 ZEC.converter(('$', 'USD'), data)
 ZEC.converter(('Ƀ', 'BTC'), data)
 ZEC.converter(('Ξ', 'ETH'), data)
 EOS.converter(('$', 'USD'), data)
 EOS.converter(('Ƀ', 'BTC'), data)
 EOS.converter(('Ξ', 'ETH'), data)
+IOT.converter(('$', 'USD'), data)
+IOT.converter(('Ƀ', 'BTC'), data)
+IOT.converter(('Ξ', 'ETH'), data)
 
 if cmdline['--prices']:
     display(dedent(f'''
@@ -106,8 +114,10 @@ if cmdline['--prices']:
                 {BTC.one} = {BTC.one:<7q$} {BTC.one:<7qɃ} {BTC.one:qΞ}
                 {ETH.one} = {ETH.one:<7q$} {ETH.one:<7qɃ} {ETH.one:qΞ}
                 {BCH.one} = {BCH.one:<7q$} {BCH.one:<7qɃ} {BCH.one:qΞ}
+                {BTG.one} = {BTG.one:<7q$} {BTG.one:<7qɃ} {BTG.one:qΞ}
                 {ZEC.one} = {ZEC.one:<7q$} {ZEC.one:<7qɃ} {ZEC.one:qΞ}
                 {EOS.one} = {EOS.one:<7q$} {EOS.one:<7qɃ} {EOS.one:qΞ}
+                {IOT.one} = {IOT.one:<7q$} {IOT.one:<7qɃ} {IOT.one:qΞ}
     ''').strip())
     done()
 
