@@ -51,7 +51,10 @@ for filename in TRANSACTIONS_FILENAMES.split():
         break
 else:
     fatal('transactions file not found in:', settings_dir)
-transactions = PythonFile(transactions_filepath)
+try:
+    transactions = PythonFile(transactions_filepath)
+except Error as e:
+    e.terminate()
 transactions.initialize()
 transactions.run()
     # running the transactions file causes accounts to be set as a side effect
@@ -187,9 +190,10 @@ for name in desired_accounts:
     total = acct.total_value()
     cost = acct.total_cost()
     if cost:
+        delta = Quantity(total-cost, '$')
         gain = 100*(total-cost)/cost
         lines.append(
-            f'        Total = {total:<13}  {gain:.0f}% gain on {cost} investment'
+            f'        Total = {total:<13}  {delta} ({gain:.0f}%) gain on {cost} investment'
         )
     else:
         lines.append(f'        Total = {total}')
