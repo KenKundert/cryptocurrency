@@ -8,14 +8,17 @@ setup(
     install_requires='''
         appdirs
         arrow
-        avendesora  # not required if you only want prices
+        avendesora
         docopt
         inform
-        matplotlib  # required only for show-cryptocurrency-history
+        matplotlib
         quantiphy
         requests
         shlib
     '''.split(),
+        # avendesora is not required, without it there is no transaction support
+        # matplotlib is not required, without it you cannot use
+        # show-cryptocurrency-history
     py_modules='cryptocurrency networth'.split(),
     scripts='cryptocurrency show-cryptocurrency-history'.split()
 )
