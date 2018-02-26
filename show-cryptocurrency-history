@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""
+Show Cryptocurrency History
+
+usage:
+    get-cryptocurrency-data [options] [<request>]
+
+options:
+    -y, --year     only show the most recent year
+    -q, --quarter  only show the most recent quarter
+    -m, --month    only show the most recent month
+
+Where <request> is one of market_cap, volume, open, close, high, low.
+If not give, the market cap is shown.
+"""
+# Currently I download the complete history every time I run. Consider caching 
+# the downloaded data into a local database, and then only download the new 
+# values. In the short term, I could simply cache the data for a day.
+
+from pathlib import Path
+from inform import Error, display, done, os_error
+from quantiphy import Quantity
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import FuncFormatter
+from docopt import docopt
+from appdirs import user_cache_dir
+from shlib import mkdir
+import arrow
+import json
+import requests
+import re
+Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek)
+
+class Currency:
+    URL = "https://coinmarketcap.com/currencies/{currency}/historical-data/?start={start}&end={end}"
+    START_ROW = '<tr class="text-right">'
+    DATE_CELL = '<td class="text-left">(?P<{}>[^<]*)</td>'
+    VALUE_CELL = '<td data-format-fiat data-format-value="[^"]*">(?P<{}>[^<]*)</td>'
+    OTHER_CELL = '<td data-format-market-cap data-format-value="[^"]*">(?P<{}>[^<]*)</td>'
+    END_ROW = '</tr>'
+    REGEX = r'\s*'.join([
+        START_ROW,
+        DATE_CELL.format('date'),
+        VALUE_CELL.format('open'),
+        VALUE_CELL.format('high'),
+        VALUE_CELL.format('low'),
+        VALUE_CELL.format('close'),
+        OTHER_CELL.format('volume'),
+        OTHER_CELL.format('market_cap'),
+        END_ROW,
+    ])
+    MATCHER = re.compile(REGEX)
+
+    @staticmethod
+    def currencies():
+        for cls in sorted(Currency.__subclasses__(), key=lambda c: c.INCEPTION_DATE):
+            yield cls
+
+    @classmethod
+    def download_data(cls):
+        display('updating', cls.CURRENCY)
+        now = arrow.now().format('YYYYMMDD')
+        url = cls.URL.format(
+            currency=cls.CURRENCY, start=cls.INCEPTION_DATE, end=now
+        )
+        try:
+            r = requests.get(url)
+            html = r.text
+            cls.data = []
+            cls.today = now
+            for match in cls.MATCHER.finditer(html):
+                cls.data.append(match.groupdict())
+            return
+        except requests.exceptions.TooManyRedirects as e:
+            reason = 'too many redirects.'
+        except requests.exceptions.HTTPError as e:
+            reason = invalid_response(response.text, 'invalid response.')
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.RequestException
+        ) as e:
+            if 'certificate_verify_failed' in str(e).lower():
+                reason = 'certificate error, consider using --insecure option.'
+            else:
+                reason = 'connection error.'
+        raise Error(reason, str(e), culprit=url)
+
+    @classmethod
+    def write_data(cls):
+        try:
+            contents = dict(date=cls.today, data=cls.data)
+            to_output = json.dumps(contents, indent=2)
+            cache_dir = Path(user_cache_dir(), 'cryptocurrency')
+            mkdir(cache_dir)
+            out_file = Path(cache_dir, cls.CURRENCY + '.json')
+            out_file.write_text(to_output)
+        except OSError as e:
+            raise Error(os_error(e))
+
+    @classmethod
+    def read_data(cls):
+        try:
+            cache_dir = Path(user_cache_dir(), 'cryptocurrency')
+            in_file = Path(cache_dir, cls.CURRENCY + '.json')
+            if not in_file.exists():
+                return False
+            loaded_text = in_file.read_text()
+            loaded_data = json.loads(loaded_text)
+            cls.today = loaded_data['date']
+            cls.data = loaded_data['data']
+            now = arrow.now().format('YYYYMMDD')
+            return cls.today == now
+        except OSError as e:
+            raise Error(os_error(e))
+        except json.JSONDecodeError as e:
+            raise Error(e)
+
+    @classmethod
+    def add_trace(cls, axis, choice, bounds):
+        # process the data
+        dates = []
+        values = []
+        for data in cls.data:
+            try:
+                v = float(data[choice].replace(',', ''))
+                d = arrow.get(data['date'], 'MMM DD, YYYY')
+                if not bounds.update(d, v):
+                    continue
+                values.append(v)
+                dates.append(d)
+            except ValueError:
+                pass
+
+        #dates = [arrow.get(d['date'], 'MMM DD, YYYY') for d in cls.data]
+        #values = [d[choice].replace(',', '') for d in cls.data]
+        #values = [Quantity(0 if v == '-' else v, units) for v in values]
+
+        trace, = axis.plot_date(
+            dates, values, color=cls.COLOR, linestyle='-', marker=None
+        )
+        trace.set_label(cls.CURRENCY)
+        axis.text(
+            dates[-1], values[-1], cls.CURRENCY,
+            verticalalignment='top', horizontalalignment='right',
+            color=cls.COLOR, fontsize=12
+        )
+
+
+class Bitcoin(Currency):
+    CURRENCY = 'bitcoin'
+    INCEPTION_DATE = '20130428'
+    COLOR = 'blue'
+
+class Ethereum(Currency):
+    CURRENCY = 'ethereum'
+    INCEPTION_DATE = '20150807'
+    COLOR = 'green'
+
+class BitcoinCash(Currency):
+    CURRENCY = 'bitcoin-cash'
+    INCEPTION_DATE = '20170723'
+    COLOR = 'red'
+
+class ZCash(Currency):
+    CURRENCY = 'zcash'
+    INCEPTION_DATE = '20161029'
+    COLOR = 'black'
+
+class Cardano(Currency):
+    CURRENCY = 'cardano'
+    INCEPTION_DATE = '20171001'
+    COLOR = 'cyan'
+
+class Stellar(Currency):
+    CURRENCY = 'stellar'
+    INCEPTION_DATE = '20140805'
+    COLOR = 'brown'
+
+class EOS(Currency):
+    CURRENCY = 'eos'
+    INCEPTION_DATE = '20170701'
+    COLOR = 'gray'
+
+class Iota(Currency):
+    CURRENCY = 'iota'
+    INCEPTION_DATE = '20170613'
+    COLOR = 'orange'
+
+#class Neo(Currency):
+#    CURRENCY = 'neo'
+#    INCEPTION_DATE = '20160909'
+#    COLOR = 'pink'
+
+class Bounds:
+    def __init__(self, cmdline):
+        self.end = arrow.now()
+        if cmdline['--year']:
+            self.start = self.end.shift(months=-12)
+        elif cmdline['--quarter']:
+            self.start = self.end.shift(months=-3)
+        elif cmdline['--month']:
+            self.start = self.end.shift(months=-1)
+        else:
+            self.start = self.end.shift(months=-5000)
+        self.xmin = self.end
+        self.ymin = float('inf')
+        self.ymax = -float('inf')
+
+    def update(self, d, v):
+        if d < self.start:
+            return False
+        if d < self.xmin:
+            self.xmin = d
+        if v < self.ymin:
+            self.ymin = v
+        if v > self.ymax:
+            self.ymax = v
+        return True
+
+    def apply(self, axis):
+        axis.set_xlim(self.xmin, self.end)
+        axis.set_ylim(0.9*self.ymin, 1.1*self.ymax)
+
+try:
+    # get choice on what to show
+    cmdline = docopt(__doc__)
+    choice = cmdline['<request>']
+    if not choice:
+        choice = 'market_cap'
+    choices = 'open high low close volume market_cap'.split()
+    if choice not in choices:
+        raise Error(
+            'invalid request, choose from:', ', '.join(choices), culprit=choice
+        )
+    units = '' if choice == 'volume' else '$'
+
+    # get interval in months
+    if cmdline['--year']:
+        interval = 12
+    elif cmdline['--quarter']:
+        interval = 3
+    elif cmdline['--month']:
+        interval = 1
+    else:
+        interval = 0
+
+    # generate the graphs
+    figure = plt.figure()
+    axis = figure.add_subplot(111)
+    axis.set_yscale('log')
+    formatter = FuncFormatter(lambda v, p: str(Quantity(v, units)))
+    axis.yaxis.set_major_formatter(formatter)
+    bounds = Bounds(cmdline)
+    for currency in Currency.currencies():
+        if not currency.read_data():
+            currency.download_data()
+            currency.write_data()
+        currency.add_trace(axis, choice, bounds)
+    bounds.apply(axis)
+    axis.legend()
+    axis.set_title(choice.replace('_', ' '))
+    plt.show()
+except Error as e:
+    e.report()
+except KeyboardInterrupt:
+    done()
+

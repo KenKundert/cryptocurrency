@@ -41,6 +41,11 @@ class Currency:
             if s.__name__ == name:
                 return Quantity(tokens, s.UNITS)
 
+class USD(Currency):
+    UNITS = 'USD'
+    SYMBOL = '$'
+    one = Quantity(1, UNITS)
+
 class BTC(Currency):
     UNITS = 'BTC'
     SYMBOL = 'Ƀ'
@@ -71,17 +76,23 @@ class EOS(Currency):
     SYMBOL = 'Ȅ'
     one = Quantity(1, UNITS)
 
-    @classmethod
-    def converter(cls, to, data):
-        # cannot convert this to '$' directly using cryptocompare.
-        # instead, use ETH as intermediary
-        conversion = data[cls.UNITS]['ETH'] * data['ETH'][to[-1]]
-        return UnitConversion(to, (cls.SYMBOL, cls.UNITS), conversion)
 
 class IOT(Currency):
     UNITS = 'IOT'
     SYMBOL = 'ι'
     one = Quantity(1, UNITS)
+
+class ADA(Currency):
+    UNITS = 'ADA'
+    SYMBOL = 'ℂ'
+    one = Quantity(1, UNITS)
+
+    # @classmethod
+    # def converter(cls, to, data):
+    # #    # cannot convert this to '$' directly using cryptocompare.
+    # #    # instead, use ETH as intermediary
+    #     conversion = data[cls.UNITS]['ETH'] * data['ETH'][to[-1]]
+    #     return UnitConversion(to, (cls.SYMBOL, cls.UNITS), conversion)
 
 accounts = {}
 class Account:

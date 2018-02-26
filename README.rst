@@ -13,7 +13,7 @@ Introduction
 ------------
 
 This program reads a file containing transactions to determine the total number 
-of cryptocurrency tokens are held and reports on the current value of the 
+of cryptocurrency tokens that are held and reports on the current value of the 
 portfolio.
 
 The transactions are read from a file contained in ~/.config/cryptocurrency. The 

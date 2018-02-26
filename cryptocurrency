@@ -20,16 +20,16 @@ the currency and value is its value in US dollars.  For example:
 '''
 
 import requests
-from inform import Color, cull, display, done, error, fatal
+from inform import Color, cull, display, done, error, fatal, join
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
-from avendesora.gpg import PythonFile
 from cryptocurrency import (
-    Currency, BTC, ETH, BCH, BTG, ZEC, EOS, IOT, accounts
+    Currency, BTC, ETH, BCH, BTG, ZEC, EOS, IOT, ADA, accounts
 )
 from appdirs import user_config_dir
 from shlib import to_path
 from docopt import docopt
+import arrow
 
 TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
 Quantity.set_prefs(prec=2)
@@ -40,33 +40,27 @@ debit = Color('red')
 cmdline = docopt(__doc__)
 desired_accounts = cmdline['<accounts>']
 show_transactions = cmdline['--transactions']
+show_prices =  cmdline['--prices']
 
-# Read the transactions
-settings_dir = cmdline['--config-dir']
-if not settings_dir:
-    settings_dir = user_config_dir('cryptocurrency')
-for filename in TRANSACTIONS_FILENAMES.split():
-    transactions_filepath = to_path(settings_dir, filename)
-    if transactions_filepath.exists():
-        break
-else:
-    fatal('transactions file not found in:', settings_dir)
-try:
-    transactions = PythonFile(transactions_filepath)
-except Error as e:
-    e.terminate()
-transactions.initialize()
-transactions.run()
-    # running the transactions file causes accounts to be set as a side effect
-
-proxies = {
-    # I cannot get the socks proxy to work
-    'http': 'socks5://127.0.0.1:9999',
-    'https': 'socks5:/127.0.0.1:9999'
-}
-proxies = None
+# find the transactions file
+if not show_prices:
+    settings_dir = cmdline['--config-dir']
+    if not settings_dir:
+        settings_dir = user_config_dir('cryptocurrency')
+    for filename in TRANSACTIONS_FILENAMES.split():
+        transactions_filepath = to_path(settings_dir, filename)
+        if transactions_filepath.exists():
+            break
+    else:
+        #fatal('transactions file not found in:', settings_dir)
+        show_prices = True
+    try:
+        from avendesora.gpg import PythonFile
+    except ImportError:
+        show_prices = True
 
 # download latest asset prices from cryptocompare.com
+proxies = None
 currencies = dict(
     fsyms=','.join(Currency.names()),  # from symbols
     tsyms='BTC,ETH,USD',               # to symbols
@@ -91,38 +85,36 @@ except:
     fatal('cryptocurrency price download was garbled.')
 
 # Create unit conversions
-BTC.converter(('$', 'USD'), data)
-BTC.converter(('Ξ', 'ETH'), data)
-ETH.converter(('$', 'USD'), data)
-ETH.converter(('Ƀ', 'BTC'), data)
-BCH.converter(('$', 'USD'), data)
-BCH.converter(('Ƀ', 'BTC'), data)
-BCH.converter(('Ξ', 'ETH'), data)
-BTG.converter(('$', 'USD'), data)
-BTG.converter(('Ƀ', 'BTC'), data)
-BTG.converter(('Ξ', 'ETH'), data)
-ZEC.converter(('$', 'USD'), data)
-ZEC.converter(('Ƀ', 'BTC'), data)
-ZEC.converter(('Ξ', 'ETH'), data)
-EOS.converter(('$', 'USD'), data)
-EOS.converter(('Ƀ', 'BTC'), data)
-EOS.converter(('Ξ', 'ETH'), data)
-IOT.converter(('$', 'USD'), data)
-IOT.converter(('Ƀ', 'BTC'), data)
-IOT.converter(('Ξ', 'ETH'), data)
+for each in Currency.__subclasses__():
+    each.converter(('$', 'USD'), data)
+    each.converter(('Ƀ', 'BTC'), data)
+    each.converter(('Ξ', 'ETH'), data)
 
-if cmdline['--prices']:
+# get current time
+now = arrow.now().format('h:mm A, dddd MMMM D')
+
+if show_prices:
     display(dedent(f'''
-        Current Prices:
-                {BTC.one} = {BTC.one:<7q$} {BTC.one:<7qɃ} {BTC.one:qΞ}
-                {ETH.one} = {ETH.one:<7q$} {ETH.one:<7qɃ} {ETH.one:qΞ}
-                {BCH.one} = {BCH.one:<7q$} {BCH.one:<7qɃ} {BCH.one:qΞ}
-                {BTG.one} = {BTG.one:<7q$} {BTG.one:<7qɃ} {BTG.one:qΞ}
-                {ZEC.one} = {ZEC.one:<7q$} {ZEC.one:<7qɃ} {ZEC.one:qΞ}
-                {EOS.one} = {EOS.one:<7q$} {EOS.one:<7qɃ} {EOS.one:qΞ}
-                {IOT.one} = {IOT.one:<7q$} {IOT.one:<7qɃ} {IOT.one:qΞ}
+        Prices as of {now}:
+            {BTC.one} = {BTC.one:<7q$} {BTC.one:<7qɃ} {BTC.one:qΞ}
+            {ETH.one} = {ETH.one:<7q$} {ETH.one:<7qɃ} {ETH.one:qΞ}
+            {BCH.one} = {BCH.one:<7q$} {BCH.one:<7qɃ} {BCH.one:qΞ}
+            {ZEC.one} = {ZEC.one:<7q$} {ZEC.one:<7qɃ} {ZEC.one:qΞ}
+            {EOS.one} = {EOS.one:<7q$} {EOS.one:<7qɃ} {EOS.one:qΞ}
+            {IOT.one} = {IOT.one:<7q$} {IOT.one:<7qɃ} {IOT.one:qΞ}
+            {ADA.one} = {ADA.one:<7q$} {ADA.one:<7qɃ} {ADA.one:qΞ}
     ''').strip())
+    #       {BTG.one} = {BTG.one:<7q$} {BTG.one:<7qɃ} {BTG.one:qΞ}
     done()
+
+# read the transactions
+try:
+    transactions = PythonFile(transactions_filepath)
+except Error as e:
+    e.terminate()
+transactions.initialize()
+transactions.run()
+    # running the transactions file causes accounts to be set as a side effect
 
 # process the specified accounts, some of which may actually be overrides
 overrides = [n for n in desired_accounts if '=' in n]
@@ -167,14 +159,14 @@ for name in desired_accounts:
             prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
             display(color(*cull([prefix, value, cost, comment])))
 
-    lines = [f"{name.title()}'s Holdings:"]
+    lines = [f"{name.title()}'s holdings as of {now}:"]
     for symbol in Currency.names():
         if symbol in acct.totals:
             tokens = acct.totals[symbol]
             value = tokens.scale('$')
             tokens = tokens.scale(symbol)
-            percentage = 100 * value / acct.total_value()
-            row = f'{tokens:>9q} = {value:<7q} {percentage:.0f}%'
+            share = 100 * value / acct.total_value()
+            row = f'{tokens:>9q} = {value:<7q} {share:.0%}'
             price = Quantity(1, symbol).scale('$')
             extra = ['{:23s}'.format(f'price={price} per {symbol}')]
             if symbol in acct.purchased:
@@ -183,20 +175,28 @@ for name in desired_accounts:
                 avg_cost = Quantity(cost/purchased, '$')
                 extra += ['{:27s}'.format(f'cost={avg_cost} for {purchased}')]
                 if avg_cost:
-                    gain = 100*(price - avg_cost)/avg_cost
-                    extra += [f'gain={gain:.0f}%']
+                    gain = (price - avg_cost)/avg_cost
+                    extra += [f'gain={gain:.0%}']
             lines.append(f"    {row:25s}  {' '.join(extra)}".rstrip())
 
     total = acct.total_value()
     cost = acct.total_cost()
     if cost:
         delta = Quantity(total-cost, '$')
-        gain = 100*(total-cost)/cost
+        gain = (total-cost)/cost
         lines.append(
-            f'        Total = {total:<13}  {delta} ({gain:.0f}%) gain on {cost} investment'
+            f'        Total = {total:<13}  {gain:.0%} ({delta}) gain on {cost} investment'
         )
     else:
         lines.append(f'        Total = {total}')
-    holdings.append('\n'.join(lines))
+    holdings.append(join(*lines, sep='\n'))
 
-display('\n\n'.join(holdings))
+display(*holdings, sep='\n\n')
+
+#try:
+#    from networth import total as non_crypto_total
+#    networth = Quantity(total + non_crypto_total, '$')
+#    percentage = total / networth
+#    display(f'    Net Worth = {networth}  {percentage:.1%}')
+#except ImportError:
+#    pass
