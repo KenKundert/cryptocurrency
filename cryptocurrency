@@ -32,7 +32,7 @@ from docopt import docopt
 import arrow
 
 TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
-Quantity.set_prefs(prec=2)
+Quantity.set_prefs(prec=2, map_sf=Quantity.map_sf_to_greek)
 credit = Color('green')
 debit = Color('red')
 
@@ -165,7 +165,7 @@ for name in desired_accounts:
             tokens = acct.totals[symbol]
             value = tokens.scale('$')
             tokens = tokens.scale(symbol)
-            share = 100 * value / acct.total_value()
+            share = value / acct.total_value()
             row = f'{tokens:>9q} = {value:<7q} {share:.0%}'
             price = Quantity(1, symbol).scale('$')
             extra = ['{:23s}'.format(f'price={price} per {symbol}')]

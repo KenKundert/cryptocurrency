@@ -187,6 +187,11 @@ class Iota(Currency):
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
 
+class BitShares(Currency):
+    CURRENCY = 'bitshares'
+    INCEPTION_DATE = '20140721'
+    COLOR = 'magenta'
+
 #class Neo(Currency):
 #    CURRENCY = 'neo'
 #    INCEPTION_DATE = '20160909'
