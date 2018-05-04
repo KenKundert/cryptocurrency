@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='cryptocurrency',
-    version='0.0.15',
+    version='0.0.16',
     author='Ken Kundert',
     license='GPLv3+',
     install_requires='''
