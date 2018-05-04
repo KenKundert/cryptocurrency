@@ -24,7 +24,7 @@ from inform import Color, cull, display, done, error, fatal, join
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from cryptocurrency import (
-    Currency, BTC, ETH, BCH, BTG, ZEC, EOS, IOT, ADA, accounts
+    Currency, accounts
 )
 from appdirs import user_config_dir
 from shlib import to_path
@@ -94,17 +94,9 @@ for each in Currency.__subclasses__():
 now = arrow.now().format('h:mm A, dddd MMMM D')
 
 if show_prices:
-    display(dedent(f'''
-        Prices as of {now}:
-            {BTC.one} = {BTC.one:<7q$} {BTC.one:<7qɃ} {BTC.one:qΞ}
-            {ETH.one} = {ETH.one:<7q$} {ETH.one:<7qɃ} {ETH.one:qΞ}
-            {BCH.one} = {BCH.one:<7q$} {BCH.one:<7qɃ} {BCH.one:qΞ}
-            {ZEC.one} = {ZEC.one:<7q$} {ZEC.one:<7qɃ} {ZEC.one:qΞ}
-            {EOS.one} = {EOS.one:<7q$} {EOS.one:<7qɃ} {EOS.one:qΞ}
-            {IOT.one} = {IOT.one:<7q$} {IOT.one:<7qɃ} {IOT.one:qΞ}
-            {ADA.one} = {ADA.one:<7q$} {ADA.one:<7qɃ} {ADA.one:qΞ}
-    ''').strip())
-    #       {BTG.one} = {BTG.one:<7q$} {BTG.one:<7qɃ} {BTG.one:qΞ}
+    display(f'Prices as of {now}:')
+    for c in Currency.currencies():
+        display(f'    {c.one} = {c.one:<7q$} {c.one:<7qɃ} {c.one:qΞ}')
     done()
 
 # read the transactions
@@ -127,7 +119,7 @@ for override in overrides:
     try:
         n, v = override.split('=')
         v = Quantity(v, '$')
-        display('Override:', UnitConversion(('USD', v.units), n, slope=v.real))
+        display(f'Override: {n} = {v:q$}')
     except ValueError:
         fatal('garbled override, expected name=value.', culprit=override)
 if overrides:

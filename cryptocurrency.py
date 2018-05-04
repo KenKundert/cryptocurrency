@@ -35,11 +35,10 @@ class Currency:
         for s in cls.__subclasses__():
             yield s.__name__
 
-    @staticmethod
-    def currency(name):
-        for s in Currency.__subclasses__():
-            if s.__name__ == name:
-                return Quantity(tokens, s.UNITS)
+    @classmethod
+    def currencies(cls):
+        for s in sorted(cls.__subclasses__(), key=lambda s: s.__name__):
+            yield s
 
 class USD(Currency):
     UNITS = 'USD'
