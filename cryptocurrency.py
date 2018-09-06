@@ -28,7 +28,10 @@ class Currency:
 
     @classmethod
     def converter(cls, to, data):
-        return UnitConversion(to, (cls.SYMBOL, cls.UNITS), data[cls.UNITS][to[-1]])
+        try:
+            return UnitConversion(to, (cls.SYMBOL, cls.UNITS), data[cls.UNITS][to[-1]])
+        except KeyError as e:
+            warn(f'missing price in {e}.', culprit=cls.UNITS)
 
     @classmethod
     def names(cls):
@@ -39,6 +42,12 @@ class Currency:
     def currencies(cls):
         for s in sorted(cls.__subclasses__(), key=lambda s: s.__name__):
             yield s
+
+    @classmethod
+    def currency(cls, name):
+        for s in cls.__subclasses__():
+            if name == s.__name__:
+                return s
 
 class USD(Currency):
     UNITS = 'USD'

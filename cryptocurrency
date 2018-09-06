@@ -10,6 +10,8 @@ options:
     -c <dir>, --config-dir  <dir>    directory that holds transactions file
     -p, --prices                     show prices rather than portfolio
     -t, --transactions               show transactions with portfolio
+    -i, --insecure                   do not check certificate of prices website
+    -P, --proxy                      connect to the internet through a proxy
 
 You can also override the current price of cryptocurrencies to examine what-if 
 scenarios.  Any account specified that contains an '=' is taken to be an 
@@ -20,7 +22,7 @@ the currency and value is its value in US dollars.  For example:
 '''
 
 import requests
-from inform import Color, cull, display, done, error, fatal, join
+from inform import Color, cull, display, done, error, fatal, join, os_error
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion
 from cryptocurrency import (
@@ -35,12 +37,24 @@ TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
 Quantity.set_prefs(prec=2, map_sf=Quantity.map_sf_to_greek)
 credit = Color('green')
 debit = Color('red')
+proxies = dict(
+    # The local socks5 proxy on port 9998.
+    # Use this at TI because they block access to cryptocompare.
+    http='socks5://localhost:9998',
+    https='socks5://localhost:9998',
+)
 
 # read the command line
 cmdline = docopt(__doc__)
 desired_accounts = cmdline['<accounts>']
 show_transactions = cmdline['--transactions']
 show_prices =  cmdline['--prices']
+insecure = cmdline['--insecure']
+if insecure:
+    requests.packages.urllib3.disable_warnings()
+use_proxy = cmdline['--proxy']
+if not use_proxy:
+    proxies = None
 
 # find the transactions file
 if not show_prices:
@@ -60,7 +74,6 @@ if not show_prices:
         show_prices = True
 
 # download latest asset prices from cryptocompare.com
-proxies = None
 currencies = dict(
     fsyms=','.join(Currency.names()),  # from symbols
     tsyms='BTC,ETH,USD',               # to symbols
@@ -69,12 +82,13 @@ url_args = '&'.join(f'{k}={v}' for k, v in currencies.items())
 base_url = f'https://min-api.cryptocompare.com/data/pricemulti'
 url = '?'.join([base_url, url_args])
 try:
-    r = requests.get(url, proxies=proxies)
+    r = requests.get(url, proxies=proxies, verify=not insecure)
 except Exception as e:
     # must catch all exceptions as requests.get() can generate a variety based 
     # on how it fails, and if the exception is not caught the thread dies and 
     # the prices mysteriously stop updating.
-    pass
+    if 'certificate verify failed' in str(e):
+        fatal('certificate verify failed for', base_url)
     fatal('cannot access cryptocurrency prices:', str(e))
 except KeyboardInterrupt:
     done()
@@ -82,7 +96,12 @@ except KeyboardInterrupt:
 try:
     data = r.json()
 except:
-    fatal('cryptocurrency price download was garbled.')
+    try:
+        to_path('error.html').write_text(r.text)
+    except:
+        fatal('cryptocurrency price download was garbled.')
+    fatal('cryptocurrency price download was garbled (look in ./error.html for response).')
+
 
 # Create unit conversions
 for each in Currency.__subclasses__():
@@ -118,8 +137,11 @@ if not desired_accounts:
 for override in overrides:
     try:
         n, v = override.split('=')
+        c = Currency.currency(n)
+        was = f'rather than {c.one:q$}' if c else '(not found)'
         v = Quantity(v, '$')
-        display(f'Override: {n} = {v:q$}')
+        UnitConversion(('USD', v.units), n, slope=v)
+        display(f'Override: {n} = {v:q$} {was}.')
     except ValueError:
         fatal('garbled override, expected name=value.', culprit=override)
 if overrides:
