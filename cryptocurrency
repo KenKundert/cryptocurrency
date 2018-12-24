@@ -9,7 +9,8 @@ usage:
 options:
     -c <dir>, --config-dir  <dir>    directory that holds transactions file
     -p, --prices                     show prices rather than portfolio
-    -t, --transactions               show transactions with portfolio
+    -T, --transactions               show transactions with portfolio
+    -t, --tokens                     show number of tokens held
     -i, --insecure                   do not check certificate of prices website
     -P, --proxy                      connect to the internet through a proxy
 
@@ -22,9 +23,9 @@ the currency and value is its value in US dollars.  For example:
 '''
 
 import requests
-from inform import Color, cull, display, done, error, fatal, join, os_error
+from inform import Color, cull, display, done, error, fatal, join, os_error, warn
 from textwrap import dedent
-from quantiphy import Quantity, UnitConversion
+from quantiphy import Quantity, UnitConversion, UnknownConversion
 from cryptocurrency import (
     Currency, accounts
 )
@@ -48,6 +49,7 @@ proxies = dict(
 cmdline = docopt(__doc__)
 desired_accounts = cmdline['<accounts>']
 show_transactions = cmdline['--transactions']
+show_tokens = cmdline['--tokens']
 show_prices =  cmdline['--prices']
 insecure = cmdline['--insecure']
 if insecure:
@@ -75,7 +77,7 @@ if not show_prices:
 
 # download latest asset prices from cryptocompare.com
 currencies = dict(
-    fsyms=','.join(Currency.names()),  # from symbols
+    fsyms=','.join(Currency.units()),  # from symbols
     tsyms='BTC,ETH,USD',               # to symbols
 )
 url_args = '&'.join(f'{k}={v}' for k, v in currencies.items())
@@ -83,15 +85,15 @@ base_url = f'https://min-api.cryptocompare.com/data/pricemulti'
 url = '?'.join([base_url, url_args])
 try:
     r = requests.get(url, proxies=proxies, verify=not insecure)
+except KeyboardInterrupt:
+    done()
 except Exception as e:
     # must catch all exceptions as requests.get() can generate a variety based 
     # on how it fails, and if the exception is not caught the thread dies and 
     # the prices mysteriously stop updating.
     if 'certificate verify failed' in str(e):
         fatal('certificate verify failed for', base_url)
-    fatal('cannot access cryptocurrency prices:', str(e))
-except KeyboardInterrupt:
-    done()
+    fatal('cannot access cryptocurrency prices:', codicil=str(e))
 
 try:
     data = r.json()
@@ -115,7 +117,10 @@ now = arrow.now().format('h:mm A, dddd MMMM D')
 if show_prices:
     display(f'Prices as of {now}:')
     for c in Currency.currencies():
-        display(f'    {c.one} = {c.one:<7q$} {c.one:<7qɃ} {c.one:qΞ}')
+        try:
+            display(f'    {c.one} = {c.one:<7q$} {c.one:<7qɃ} {c.one:qΞ}')
+        except UnknownConversion:
+            pass
     done()
 
 # read the transactions
@@ -173,14 +178,26 @@ for name in desired_accounts:
             prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
             display(color(*cull([prefix, value, cost, comment])))
 
-    lines = [f"{name.title()}'s holdings as of {now}:"]
+
+    if show_tokens:
+        display(f"{name.title()}'s tokens as of {now}:")
+        for k in sorted(acct.totals):
+            display(f'    {acct.totals[k]:.4P}')
+        display()
+
+    title = f"{name.title()}'s holdings as of {now}:"
+    currency = {}
     for symbol in Currency.names():
         if symbol in acct.totals:
             tokens = acct.totals[symbol]
-            value = tokens.scale('$')
+            try:
+                value = tokens.scale('$')
+            except UnknownConversion as e:
+                warn(e)
+                continue
             tokens = tokens.scale(symbol)
             share = value / acct.total_value()
-            row = f'{tokens:>9q} = {value:<7q} {share:.0%}'
+            row = f'{tokens:>11q} = {value:<7q} {share:.0%}'
             price = Quantity(1, symbol).scale('$')
             extra = ['{:23s}'.format(f'price={price} per {symbol}')]
             if symbol in acct.purchased:
@@ -191,19 +208,22 @@ for name in desired_accounts:
                 if avg_cost:
                     gain = (price - avg_cost)/avg_cost
                     extra += [f'gain={gain:.0%}']
-            lines.append(f"    {row:25s}  {' '.join(extra)}".rstrip())
+            currency[value] = f"    {row:25s}  {' '.join(extra)}".rstrip()
 
     total = acct.total_value()
     cost = acct.total_cost()
     if cost:
         delta = Quantity(total-cost, '$')
         gain = (total-cost)/cost
-        lines.append(
-            f'        Total = {total:<13}  {gain:.0%} ({delta}) gain on {cost} investment'
-        )
+        combined = f'        Total = {total:<13}  {gain:.0%} ({delta}) gain on {cost} investment'
     else:
-        lines.append(f'        Total = {total}')
-    holdings.append(join(*lines, sep='\n'))
+        combined = f'        Total = {total}'
+    summary = (
+        [title] +
+        [currency[v] for v in sorted(currency, reverse=True)] +
+        [combined]
+    )
+    holdings.append(join(*summary, sep='\n'))
 
 display(*holdings, sep='\n\n')
 

@@ -1,5 +1,5 @@
-from quantiphy import Quantity, UnitConversion
-from inform import warn
+from quantiphy import Quantity, UnitConversion, UnknownConversion
+from inform import warn, comment
 
 __version__ = '0.0.16'
 __released__ = '2018-05-03'
@@ -29,14 +29,18 @@ class Currency:
     @classmethod
     def converter(cls, to, data):
         try:
-            return UnitConversion(to, (cls.SYMBOL, cls.UNITS), data[cls.UNITS][to[-1]])
+            # SYMBOL is not unique
+            #return UnitConversion(to, (cls.SYMBOL, cls.UNITS), data[cls.UNITS][to[-1]])
+            return UnitConversion(to, cls.UNITS, data[cls.UNITS][to[-1]])
         except KeyError as e:
-            warn(f'missing price in {e}.', culprit=cls.UNITS)
+            comment(f'missing price in {e}.', culprit=cls.UNITS)
 
     @classmethod
     def names(cls):
         for s in cls.__subclasses__():
             yield s.__name__
+
+    units = names
 
     @classmethod
     def currencies(cls):
@@ -51,47 +55,55 @@ class Currency:
 
 class USD(Currency):
     UNITS = 'USD'
+    NAME = 'US Dollar'
     SYMBOL = '$'
     one = Quantity(1, UNITS)
 
 class BTC(Currency):
     UNITS = 'BTC'
+    NAME = 'Bitcoin'
     SYMBOL = 'Ƀ'
     one = Quantity(1, UNITS)
 
 class ETH(Currency):
     UNITS = 'ETH'
+    NAME = 'Ethereum'
     SYMBOL = 'Ξ'
     one = Quantity(1, UNITS)
 
 class BCH(Currency):
     UNITS = 'BCH'
+    NAME = 'Bitcoin Cash'
     SYMBOL = '฿'
     one = Quantity(1, UNITS)
 
 class BTG(Currency):
     UNITS = 'BTG'
+    NAME = 'Bitcoin Gold'
     SYMBOL = '฿'
-    one = Quantity(1, UNITS)
-
-class ZEC(Currency):
-    UNITS = 'ZEC'
-    SYMBOL = 'ⓩ'
     one = Quantity(1, UNITS)
 
 class EOS(Currency):
     UNITS = 'EOS'
+    NAME = 'EOS'
     SYMBOL = 'Ȅ'
     one = Quantity(1, UNITS)
 
+class ZEC(Currency):
+    UNITS = 'ZEC'
+    NAME = 'Zcash'
+    SYMBOL = 'ⓩ'
+    one = Quantity(1, UNITS)
 
 class IOT(Currency):
     UNITS = 'IOT'
+    NAME = 'IOTA'
     SYMBOL = 'ι'
     one = Quantity(1, UNITS)
 
 class ADA(Currency):
     UNITS = 'ADA'
+    NAME = 'Cardano'
     SYMBOL = 'ℂ'
     one = Quantity(1, UNITS)
 
@@ -101,6 +113,31 @@ class ADA(Currency):
     # #    # instead, use ETH as intermediary
     #     conversion = data[cls.UNITS]['ETH'] * data['ETH'][to[-1]]
     #     return UnitConversion(to, (cls.SYMBOL, cls.UNITS), conversion)
+
+class BLACK(Currency):
+    UNITS = 'BLACK'
+    NAME = 'EOS Black'
+    one = Quantity(1, UNITS)
+
+class HORUS(Currency):
+    UNITS = 'HORUS'
+    NAME = 'Horus Pay'
+    one = Quantity(1, UNITS)
+
+class IQ(Currency):
+    UNITS = 'IQ'
+    NAME = 'Everipedia'
+    one = Quantity(1, UNITS)
+
+class CET(Currency):
+    UNITS = 'CET'
+    NAME = 'CoinEx'
+    one = Quantity(1, UNITS)
+
+class KARMA(Currency):
+    UNITS = 'KARMA'
+    NAME = 'Karma'
+    one = Quantity(1, UNITS)
 
 accounts = {}
 class Account:
@@ -148,9 +185,13 @@ class Account:
 
     def total_value(self):
         "Total value of current holdings in dollars."
-        return Quantity(
-            sum(token.scale('$') for token in self.totals.values()), '$'
-        )
+        total_dollars = 0
+        for token in self.totals.values():
+            try:
+                total_dollars += token.scale('$')
+            except UnknownConversion:
+                pass # this will get reported elsewhere
+        return Quantity(total_dollars, '$')
 
     def total_cost(self):
         "Total cost of tokens purchased in dollars."

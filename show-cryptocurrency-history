@@ -10,15 +10,21 @@ options:
     -q, --quarter  only show the most recent quarter
     -m, --month    only show the most recent month
 
-Where <request> is one of market_cap, volume, open, close, high, low.
-If not give, the market cap is shown.
+Where <request> is one of market_cap, volume, open, close, high, low, holdings.
+If not given, the market cap is shown.
+
+Holdings can be a bit misleading. It is the historical price multiplied by the 
+current holdings.
 """
 # Currently I download the complete history every time I run. Consider caching 
 # the downloaded data into a local database, and then only download the new 
 # values. In the short term, I could simply cache the data for a day.
 
+# Holdings simply multiplies the historical price by the current holdings. It 
+# would be much better if I could multiply it by the historical holdings.
+
 from pathlib import Path
-from inform import Error, display, done, os_error
+from inform import Error, display, done, error, os_error
 from quantiphy import Quantity
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -84,7 +90,7 @@ class Currency:
                 reason = 'certificate error, consider using --insecure option.'
             else:
                 reason = 'connection error.'
-        raise Error(reason, str(e), culprit=url)
+            raise Error(reason, codicil=str(e), culprit=url)
 
     @classmethod
     def write_data(cls):
@@ -121,9 +127,15 @@ class Currency:
         # process the data
         dates = []
         values = []
+        if choice == 'holdings':
+            scale = cls.HOLDINGS
+            choice = 'close'
+        else:
+            scale = 1
+
         for data in cls.data:
             try:
-                v = float(data[choice].replace(',', ''))
+                v = scale*float(data[choice].replace(',', ''))
                 d = arrow.get(data['date'], 'MMM DD, YYYY')
                 if not bounds.update(d, v):
                     continue
@@ -151,46 +163,65 @@ class Bitcoin(Currency):
     CURRENCY = 'bitcoin'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
+    HOLDINGS = 22.4
 
 class Ethereum(Currency):
     CURRENCY = 'ethereum'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
+    HOLDINGS = 311
 
 class BitcoinCash(Currency):
     CURRENCY = 'bitcoin-cash'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
+    HOLDINGS = 14.7
+
+class BitcoinGold(Currency):
+    CURRENCY = 'bitcoin-gold'
+    INCEPTION_DATE = '20171023'
+    COLOR = 'gold'
+    HOLDINGS = 11.2
 
 class ZCash(Currency):
     CURRENCY = 'zcash'
     INCEPTION_DATE = '20161029'
-    COLOR = 'black'
+    COLOR = 'magenta'
+    HOLDINGS = 13.9
 
 class Cardano(Currency):
     CURRENCY = 'cardano'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
+    HOLDINGS = 8999
 
-class Stellar(Currency):
-    CURRENCY = 'stellar'
-    INCEPTION_DATE = '20140805'
-    COLOR = 'brown'
+#class Stellar(Currency):
+#    CURRENCY = 'stellar'
+#    INCEPTION_DATE = '20140805'
+#    COLOR = 'brown'
 
 class EOS(Currency):
     CURRENCY = 'eos'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
+    HOLDINGS = 1982.7656
 
 class Iota(Currency):
     CURRENCY = 'iota'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
+    HOLDINGS = 2500
 
-class BitShares(Currency):
-    CURRENCY = 'bitshares'
-    INCEPTION_DATE = '20140721'
-    COLOR = 'magenta'
+class EosBlack(Currency):
+    CURRENCY = 'eosblack'
+    INCEPTION_DATE = '20180907'
+    COLOR = 'black'
+    HOLDINGS = 1982.7656
+
+#class BitShares(Currency):
+#    CURRENCY = 'bitshares'
+#    INCEPTION_DATE = '20140721'
+#    COLOR = 'magenta'
 
 #class Neo(Currency):
 #    CURRENCY = 'neo'
@@ -233,7 +264,7 @@ try:
     choice = cmdline['<request>']
     if not choice:
         choice = 'market_cap'
-    choices = 'open high low close volume market_cap'.split()
+    choices = 'open high low close volume market_cap holdings'.split()
     if choice not in choices:
         raise Error(
             'invalid request, choose from:', ', '.join(choices), culprit=choice
@@ -261,7 +292,10 @@ try:
         if not currency.read_data():
             currency.download_data()
             currency.write_data()
-        currency.add_trace(axis, choice, bounds)
+        try:
+            currency.add_trace(axis, choice, bounds)
+        except IndexError:
+            error('not available.', culprit=currency.CURRENCY)
     bounds.apply(axis)
     axis.legend()
     axis.set_title(choice.replace('_', ' '))
