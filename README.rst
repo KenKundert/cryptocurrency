@@ -77,3 +77,32 @@ dollars.  For example::
 
     cryptocurrency BTC=100k
     cryptocurrency BTC=100k ETH=5k
+
+
+Show Cyptocurrency History
+--------------------------
+
+You can also graph cryptocurrency history using *show-cryptocurrency-history*::
+
+    Show Cryptocurrency History
+
+    usage:
+        get-cryptocurrency-data [options] [<request>]
+
+    options:
+        -y, --year       only show the most recent year
+        -q, --quarter    only show the most recent quarter
+        -m, --month      only show the most recent month
+        -n, --normalize  show normalized to latest value
+
+    Where <request> is one of market_cap, volume, open, close, high, low, holdings.
+    If not given, the market cap is shown.
+
+    Holdings can be a bit misleading. It is the historical price multiplied by the 
+    current holdings.
+
+This program does not use the transaction history. Instead it requires that you 
+modify the program itself to identify the tokens you wish to see along with your 
+current holdings in those tokens.
+
+.. image:: close190417.png
