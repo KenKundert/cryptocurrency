@@ -39,10 +39,10 @@ Quantity.set_prefs(prec=2, map_sf=Quantity.map_sf_to_greek)
 credit = Color('green')
 debit = Color('red')
 proxies = dict(
-    # The local socks5 proxy on port 9998.
+    # The local socks5 proxy on port 9997.
     # Use this at TI because they block access to cryptocompare.
-    http='socks5://localhost:9998',
-    https='socks5://localhost:9998',
+    http='socks5://localhost:9997',
+    https='socks5://localhost:9997',
 )
 
 # read the command line

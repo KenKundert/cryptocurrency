@@ -163,37 +163,37 @@ class Bitcoin(Currency):
     CURRENCY = 'bitcoin'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
-    HOLDINGS = 22.4
+    HOLDINGS = 1
 
 class Ethereum(Currency):
     CURRENCY = 'ethereum'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
-    HOLDINGS = 311
+    HOLDINGS = 1
 
 class BitcoinCash(Currency):
     CURRENCY = 'bitcoin-cash'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
-    HOLDINGS = 14.7
+    HOLDINGS = 1
 
 class BitcoinGold(Currency):
     CURRENCY = 'bitcoin-gold'
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
-    HOLDINGS = 11.2
+    HOLDINGS = 1
 
 class ZCash(Currency):
     CURRENCY = 'zcash'
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
-    HOLDINGS = 13.9
+    HOLDINGS = 1
 
 class Cardano(Currency):
     CURRENCY = 'cardano'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
-    HOLDINGS = 8999
+    HOLDINGS = 1
 
 #class Stellar(Currency):
 #    CURRENCY = 'stellar'
@@ -204,19 +204,19 @@ class EOS(Currency):
     CURRENCY = 'eos'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
-    HOLDINGS = 1982.7656
+    HOLDINGS = 1
 
 class Iota(Currency):
     CURRENCY = 'iota'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
-    HOLDINGS = 2500
+    HOLDINGS = 1
 
 class EosBlack(Currency):
     CURRENCY = 'eosblack'
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
-    HOLDINGS = 1982.7656
+    HOLDINGS = 1
 
 #class BitShares(Currency):
 #    CURRENCY = 'bitshares'
