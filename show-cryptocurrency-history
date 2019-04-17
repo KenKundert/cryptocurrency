@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Usage {{{1
 """
 Show Cryptocurrency History
 
@@ -6,9 +7,10 @@ usage:
     get-cryptocurrency-data [options] [<request>]
 
 options:
-    -y, --year     only show the most recent year
-    -q, --quarter  only show the most recent quarter
-    -m, --month    only show the most recent month
+    -y, --year       only show the most recent year
+    -q, --quarter    only show the most recent quarter
+    -m, --month      only show the most recent month
+    -n, --normalize  show normalized to latest value
 
 Where <request> is one of market_cap, volume, open, close, high, low, holdings.
 If not given, the market cap is shown.
@@ -23,12 +25,13 @@ current holdings.
 # Holdings simply multiplies the historical price by the current holdings. It 
 # would be much better if I could multiply it by the historical holdings.
 
+# Imports {{{1
 from pathlib import Path
 from inform import Error, display, done, error, os_error
 from quantiphy import Quantity
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, NullFormatter
 from docopt import docopt
 from appdirs import user_cache_dir
 from shlib import mkdir
@@ -38,6 +41,7 @@ import requests
 import re
 Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek)
 
+# Currency class {{{1
 class Currency:
     URL = "https://coinmarketcap.com/currencies/{currency}/historical-data/?start={start}&end={end}"
     START_ROW = '<tr class="text-right">'
@@ -58,11 +62,13 @@ class Currency:
     ])
     MATCHER = re.compile(REGEX)
 
+    # currencies() {{{2
     @staticmethod
     def currencies():
         for cls in sorted(Currency.__subclasses__(), key=lambda c: c.INCEPTION_DATE):
             yield cls
 
+    # download_data() {{{2
     @classmethod
     def download_data(cls):
         display('updating', cls.CURRENCY)
@@ -92,6 +98,7 @@ class Currency:
                 reason = 'connection error.'
             raise Error(reason, codicil=str(e), culprit=url)
 
+    # write_data() {{{2
     @classmethod
     def write_data(cls):
         try:
@@ -104,6 +111,7 @@ class Currency:
         except OSError as e:
             raise Error(os_error(e))
 
+    # read_data() {{{2
     @classmethod
     def read_data(cls):
         try:
@@ -122,8 +130,9 @@ class Currency:
         except json.JSONDecodeError as e:
             raise Error(e)
 
+    # add_trace() {{{2
     @classmethod
-    def add_trace(cls, axis, choice, bounds):
+    def add_trace(cls, axis, choice, bounds, normalize):
         # process the data
         dates = []
         values = []
@@ -132,6 +141,9 @@ class Currency:
             choice = 'close'
         else:
             scale = 1
+
+        if normalize:
+            scale = 1/float(cls.data[0][choice].replace(',', ''))
 
         for data in cls.data:
             try:
@@ -144,10 +156,6 @@ class Currency:
             except ValueError:
                 pass
 
-        #dates = [arrow.get(d['date'], 'MMM DD, YYYY') for d in cls.data]
-        #values = [d[choice].replace(',', '') for d in cls.data]
-        #values = [Quantity(0 if v == '-' else v, units) for v in values]
-
         trace, = axis.plot_date(
             dates, values, color=cls.COLOR, linestyle='-', marker=None
         )
@@ -159,75 +167,92 @@ class Currency:
         )
 
 
+# Currency classes {{{1
+# Bitcoin {{{2
 class Bitcoin(Currency):
     CURRENCY = 'bitcoin'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
     HOLDINGS = 1
 
+# Ethereum {{{2
 class Ethereum(Currency):
     CURRENCY = 'ethereum'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
     HOLDINGS = 1
 
+# BitcoinCash {{{2
 class BitcoinCash(Currency):
     CURRENCY = 'bitcoin-cash'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
     HOLDINGS = 1
 
+# BitcoinGold {{{2
 class BitcoinGold(Currency):
     CURRENCY = 'bitcoin-gold'
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
     HOLDINGS = 1
 
+# ZCash {{{2
 class ZCash(Currency):
     CURRENCY = 'zcash'
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
     HOLDINGS = 1
 
+# Cardano {{{2
 class Cardano(Currency):
     CURRENCY = 'cardano'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
     HOLDINGS = 1
 
+# Stellar {{{2
 #class Stellar(Currency):
 #    CURRENCY = 'stellar'
 #    INCEPTION_DATE = '20140805'
 #    COLOR = 'brown'
+#    HOLDINGS = 1
 
-class EOS(Currency):
+# Eos {{{2
+class Eos(Currency):
     CURRENCY = 'eos'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
     HOLDINGS = 1
 
+# Iota {{{2
 class Iota(Currency):
     CURRENCY = 'iota'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
     HOLDINGS = 1
 
+# Eos Black {{{2
 class EosBlack(Currency):
     CURRENCY = 'eosblack'
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
     HOLDINGS = 1
 
+# Bit Shares {{{2
 #class BitShares(Currency):
 #    CURRENCY = 'bitshares'
 #    INCEPTION_DATE = '20140721'
 #    COLOR = 'magenta'
+#    HOLDINGS = 1
 
+# Neo {{{2
 #class Neo(Currency):
 #    CURRENCY = 'neo'
 #    INCEPTION_DATE = '20160909'
 #    COLOR = 'pink'
+#    HOLDINGS = 1
 
+# Bounds class {{{1
 class Bounds:
     def __init__(self, cmdline):
         self.end = arrow.now()
@@ -258,20 +283,20 @@ class Bounds:
         axis.set_xlim(self.xmin, self.end)
         axis.set_ylim(0.9*self.ymin, 1.1*self.ymax)
 
+# main {{{1
 try:
-    # get choice on what to show
+    # get choice on what to show {{{2
     cmdline = docopt(__doc__)
     choice = cmdline['<request>']
     if not choice:
-        choice = 'market_cap'
+        choice = 'holdings'
     choices = 'open high low close volume market_cap holdings'.split()
     if choice not in choices:
         raise Error(
             'invalid request, choose from:', ', '.join(choices), culprit=choice
         )
-    units = '' if choice == 'volume' else '$'
 
-    # get interval in months
+    # get interval in months {{{2
     if cmdline['--year']:
         interval = 12
     elif cmdline['--quarter']:
@@ -281,22 +306,33 @@ try:
     else:
         interval = 0
 
-    # generate the graphs
+    # process normalize option {{{2
+    normalize = cmdline['--normalize']
+    if choice == 'holdings' and normalize:
+        display('Showing normalized prices at close.')
+        choice = 'close'
+    units = '' if choice == 'volume' or normalize else '$'
+
+    # generate the graph {{{2
+    bounds = Bounds(cmdline)
     figure = plt.figure()
     axis = figure.add_subplot(111)
-    axis.set_yscale('log')
-    formatter = FuncFormatter(lambda v, p: str(Quantity(v, units)))
-    axis.yaxis.set_major_formatter(formatter)
-    bounds = Bounds(cmdline)
     for currency in Currency.currencies():
         if not currency.read_data():
             currency.download_data()
             currency.write_data()
         try:
-            currency.add_trace(axis, choice, bounds)
+            currency.add_trace(axis, choice, bounds, normalize)
         except IndexError:
             error('not available.', culprit=currency.CURRENCY)
     bounds.apply(axis)
+    axis.set_yscale('log')
+    formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
+    axis.yaxis.set_major_formatter(formatter)
+    if bounds.ymax / bounds.ymin > 10:
+        axis.yaxis.set_minor_formatter(NullFormatter())
+    else:
+        axis.yaxis.set_minor_formatter(formatter)
     axis.legend()
     axis.set_title(choice.replace('_', ' '))
     plt.show()
@@ -304,4 +340,3 @@ except Error as e:
     e.report()
 except KeyboardInterrupt:
     done()
-
