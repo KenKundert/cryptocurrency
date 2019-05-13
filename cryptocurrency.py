@@ -1,5 +1,5 @@
 from quantiphy import Quantity, UnitConversion, UnknownConversion
-from inform import warn, comment
+from inform import warn, comment, cull
 
 __version__ = '0.0.17'
 __released__ = '2019-04-17'
@@ -119,10 +119,28 @@ class BLACK(Currency):
     NAME = 'EOS Black'
     one = Quantity(1, UNITS)
 
+    @classmethod
+    def converter(cls, to, data):
+        # cannot convert this to '$' directly using cryptocompare.
+        # instead, use EOS as intermediary
+        conversion = data[cls.UNITS]['EOS'] * data['EOS'][to[-1]]
+        units = getattr(cls, 'UNITS', None)
+        symbol = getattr(cls, 'SYMBOL', None)
+        return UnitConversion(to, cull([symbol, units]), conversion)
+
 class HORUS(Currency):
     UNITS = 'HORUS'
     NAME = 'Horus Pay'
     one = Quantity(1, UNITS)
+
+    @classmethod
+    def converter(cls, to, data):
+        # cannot convert this to '$' directly using cryptocompare.
+        # instead, use EOS as intermediary
+        conversion = data[cls.UNITS]['EOS'] * data['EOS'][to[-1]]
+        units = getattr(cls, 'UNITS', None)
+        symbol = getattr(cls, 'SYMBOL', None)
+        return UnitConversion(to, cull([symbol, units]), conversion)
 
 class IQ(Currency):
     UNITS = 'IQ'

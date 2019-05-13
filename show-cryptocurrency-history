@@ -175,7 +175,7 @@ class Bitcoin(Currency):
     SYMBOL = 'BTC'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
-    HOLDINGS = 22.4
+    HOLDINGS = 0
 
 # Ethereum {{{2
 class Ethereum(Currency):
@@ -183,7 +183,7 @@ class Ethereum(Currency):
     SYMBOL = 'ETH'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
-    HOLDINGS = 311.1298
+    HOLDINGS = 0
 
 # BitcoinCash {{{2
 class BitcoinCash(Currency):
@@ -191,7 +191,7 @@ class BitcoinCash(Currency):
     SYMBOL = 'BCH'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
-    HOLDINGS = 14.7
+    HOLDINGS = 0
 
 # BitcoinGold {{{2
 class BitcoinGold(Currency):
@@ -199,7 +199,7 @@ class BitcoinGold(Currency):
     SYMBOL = 'BTG'
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
-    HOLDINGS = 11.2
+    HOLDINGS = 0
 
 # ZCash {{{2
 class ZCash(Currency):
@@ -207,7 +207,7 @@ class ZCash(Currency):
     SYMBOL = 'ZEC'
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
-    HOLDINGS = 13.9
+    HOLDINGS = 0
 
 # Cardano {{{2
 class Cardano(Currency):
@@ -215,7 +215,7 @@ class Cardano(Currency):
     SYMBOL = 'ADA'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
-    HOLDINGS = 8991
+    HOLDINGS = 0
 
 # Stellar {{{2
 #class Stellar(Currency):
@@ -230,7 +230,7 @@ class Eos(Currency):
     SYMBOL = 'ADA'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
-    HOLDINGS = 4082.8656
+    HOLDINGS = 0
 
 # Iota {{{2
 class Iota(Currency):
@@ -238,7 +238,7 @@ class Iota(Currency):
     SYMBOL = 'IOT'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
-    HOLDINGS = 2503
+    HOLDINGS = 0
 
 # Eos Black {{{2
 class EosBlack(Currency):
@@ -246,7 +246,7 @@ class EosBlack(Currency):
     SYMBOL = 'BLACK'
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
-    HOLDINGS = 1982.7656
+    HOLDINGS = 0
 
 # Bit Shares {{{2
 #class BitShares(Currency):
@@ -335,14 +335,15 @@ try:
             currency.add_trace(axis, choice, bounds, normalize)
         except IndexError:
             error('not available.', culprit=currency.CURRENCY)
-    bounds.apply(axis)
-    axis.set_yscale('log')
-    formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
-    axis.yaxis.set_major_formatter(formatter)
-    if bounds.ymax / bounds.ymin > 10:
-        axis.yaxis.set_minor_formatter(NullFormatter())
-    else:
-        axis.yaxis.set_minor_formatter(formatter)
+    if bounds.ymax != bounds.ymin:
+        bounds.apply(axis)
+        axis.set_yscale('log')
+        formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
+        axis.yaxis.set_major_formatter(formatter)
+        if bounds.ymax / bounds.ymin > 10:
+            axis.yaxis.set_minor_formatter(NullFormatter())
+        else:
+            axis.yaxis.set_minor_formatter(formatter)
     axis.legend()
     axis.set_title(choice.replace('_', ' '))
     plt.show()

@@ -44,6 +44,7 @@ proxies = dict(
     http='socks5://localhost:9997',
     https='socks5://localhost:9997',
 )
+reference_currencies = 'BTC EOS ETH USD'.split()
 
 # read the command line
 cmdline = docopt(__doc__)
@@ -77,8 +78,8 @@ if not show_prices:
 
 # download latest asset prices from cryptocompare.com
 currencies = dict(
-    fsyms=','.join(Currency.units()),  # from symbols
-    tsyms='BTC,ETH,USD',               # to symbols
+    fsyms=','.join(Currency.units()),      # from symbols
+    tsyms=','.join(reference_currencies),  # to symbols
 )
 url_args = '&'.join(f'{k}={v}' for k, v in currencies.items())
 base_url = f'https://min-api.cryptocompare.com/data/pricemulti'
@@ -107,9 +108,9 @@ except:
 
 # Create unit conversions
 for each in Currency.__subclasses__():
-    each.converter(('$', 'USD'), data)
-    each.converter(('Ƀ', 'BTC'), data)
-    each.converter(('Ξ', 'ETH'), data)
+    for ref in reference_currencies:
+        currency = Currency.currency(ref)
+        each.converter(cull([currency.SYMBOL, currency.UNITS]), data)
 
 # get current time
 now = arrow.now().format('h:mm A, dddd MMMM D')
@@ -118,7 +119,7 @@ if show_prices:
     display(f'Prices as of {now}:')
     for c in Currency.currencies():
         try:
-            display(f'    {c.one} = {c.one:<7q$} {c.one:<7qɃ} {c.one:qΞ}')
+            display(f'    {c.one:<7s} = {c.one:<7q$} {c.one:<7qɃ} {c.one:<7qΞ} {c.one:qȄ}')
         except UnknownConversion:
             pass
     done()
