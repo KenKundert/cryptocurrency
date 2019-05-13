@@ -142,8 +142,9 @@ class Currency:
         else:
             scale = 1
 
+        most_recent = Quantity(cls.data[0][choice].replace(',', ''), '$')
         if normalize:
-            scale = 1/float(cls.data[0][choice].replace(',', ''))
+            scale = 1/most_recent
 
         for data in cls.data:
             try:
@@ -159,9 +160,9 @@ class Currency:
         trace, = axis.plot_date(
             dates, values, color=cls.COLOR, linestyle='-', marker=None
         )
-        trace.set_label(cls.CURRENCY)
+        trace.set_label(f'{cls.SYMBOL} ({most_recent:#.2p})')
         axis.text(
-            dates[-1], values[-1], cls.CURRENCY,
+            dates[-1], values[-1], cls.SYMBOL,
             verticalalignment='top', horizontalalignment='right',
             color=cls.COLOR, fontsize=12
         )
@@ -171,86 +172,95 @@ class Currency:
 # Bitcoin {{{2
 class Bitcoin(Currency):
     CURRENCY = 'bitcoin'
+    SYMBOL = 'BTC'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
-    HOLDINGS = 1
+    HOLDINGS = 22.4
 
 # Ethereum {{{2
 class Ethereum(Currency):
     CURRENCY = 'ethereum'
+    SYMBOL = 'ETH'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
-    HOLDINGS = 1
+    HOLDINGS = 311.1298
 
 # BitcoinCash {{{2
 class BitcoinCash(Currency):
     CURRENCY = 'bitcoin-cash'
+    SYMBOL = 'BCH'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
-    HOLDINGS = 1
+    HOLDINGS = 14.7
 
 # BitcoinGold {{{2
 class BitcoinGold(Currency):
     CURRENCY = 'bitcoin-gold'
+    SYMBOL = 'BTG'
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
-    HOLDINGS = 1
+    HOLDINGS = 11.2
 
 # ZCash {{{2
 class ZCash(Currency):
     CURRENCY = 'zcash'
+    SYMBOL = 'ZEC'
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
-    HOLDINGS = 1
+    HOLDINGS = 13.9
 
 # Cardano {{{2
 class Cardano(Currency):
     CURRENCY = 'cardano'
+    SYMBOL = 'ADA'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
-    HOLDINGS = 1
+    HOLDINGS = 8991
 
 # Stellar {{{2
 #class Stellar(Currency):
 #    CURRENCY = 'stellar'
+#    SYMBOL = 'XLM'
 #    INCEPTION_DATE = '20140805'
 #    COLOR = 'brown'
-#    HOLDINGS = 1
 
 # Eos {{{2
 class Eos(Currency):
     CURRENCY = 'eos'
+    SYMBOL = 'ADA'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
-    HOLDINGS = 1
+    HOLDINGS = 4082.8656
 
 # Iota {{{2
 class Iota(Currency):
     CURRENCY = 'iota'
+    SYMBOL = 'IOT'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
-    HOLDINGS = 1
+    HOLDINGS = 2503
 
 # Eos Black {{{2
 class EosBlack(Currency):
     CURRENCY = 'eosblack'
+    SYMBOL = 'BLACK'
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
-    HOLDINGS = 1
+    HOLDINGS = 1982.7656
 
 # Bit Shares {{{2
 #class BitShares(Currency):
 #    CURRENCY = 'bitshares'
+#    SYMBOL = 'BTS'
 #    INCEPTION_DATE = '20140721'
 #    COLOR = 'magenta'
-#    HOLDINGS = 1
 
 # Neo {{{2
 #class Neo(Currency):
 #    CURRENCY = 'neo'
+#    SYMBOL = 'NEO'
 #    INCEPTION_DATE = '20160909'
 #    COLOR = 'pink'
-#    HOLDINGS = 1
 
 # Bounds class {{{1
 class Bounds:
