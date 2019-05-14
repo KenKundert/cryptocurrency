@@ -214,3 +214,16 @@ class Account:
     def total_cost(self):
         "Total cost of tokens purchased in dollars."
         return Quantity(sum(self.costs.values()), '$')
+
+    def largest_share(self):
+        "Value of currency in dollars with the largest holdings."
+        max_dollars = 0
+        for token in self.totals.values():
+            try:
+                dollars = token.scale('$')
+                if dollars >= max_dollars:
+                    max_dollars = dollars
+            except UnknownConversion:
+                pass # this will get reported elsewhere
+        return Quantity(max_dollars, '$')
+

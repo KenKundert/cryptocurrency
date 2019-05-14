@@ -7,7 +7,8 @@ usage:
     cryptocurrency [options] [<accounts>...]
 
 options:
-    -c <dir>, --config-dir  <dir>    directory that holds transactions file
+    -C <dir>, --config-dir  <dir>    directory that holds transactions file
+    -c, --cost                       show cost
     -p, --prices                     show prices rather than portfolio
     -T, --transactions               show transactions with portfolio
     -t, --tokens                     show number of tokens held
@@ -23,12 +24,12 @@ the currency and value is its value in US dollars.  For example:
 '''
 
 import requests
-from inform import Color, cull, display, done, error, fatal, join, os_error, warn
+from inform import (
+    Color, cull, display, done, error, fatal, join, os_error, warn, render_bar
+)
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion, UnknownConversion
-from cryptocurrency import (
-    Currency, accounts
-)
+from cryptocurrency import Currency, accounts
 from appdirs import user_config_dir
 from shlib import to_path
 from docopt import docopt
@@ -52,6 +53,7 @@ desired_accounts = cmdline['<accounts>']
 show_transactions = cmdline['--transactions']
 show_tokens = cmdline['--tokens']
 show_prices =  cmdline['--prices']
+show_cost =  cmdline['--cost']
 insecure = cmdline['--insecure']
 if insecure:
     requests.packages.urllib3.disable_warnings()
@@ -188,6 +190,8 @@ for name in desired_accounts:
 
     title = f"{name.title()}'s holdings as of {now}:"
     currency = {}
+    total = acct.total_value()
+    largest_share = acct.largest_share()
     for symbol in Currency.names():
         if symbol in acct.totals:
             tokens = acct.totals[symbol]
@@ -197,21 +201,25 @@ for name in desired_accounts:
                 warn(e)
                 continue
             tokens = tokens.scale(symbol)
-            share = value / acct.total_value()
-            row = f'{tokens:>11q} = {value:<7q} {share:.0%}'
+            share = value / total
             price = Quantity(1, symbol).scale('$')
-            extra = ['{:23s}'.format(f'price={price} per {symbol}')]
-            if symbol in acct.purchased:
-                cost = acct.costs[symbol]
-                purchased = acct.purchased[symbol]
-                avg_cost = Quantity(cost/purchased, '$')
-                extra += ['{:27s}'.format(f'cost={avg_cost} for {purchased}')]
-                if avg_cost:
-                    gain = (price - avg_cost)/avg_cost
-                    extra += [f'gain={gain:.0%}']
-            currency[value] = f"    {row:25s}  {' '.join(extra)}".rstrip()
+            row = f'{tokens:>11q} = {value:<7q} {share:.0%}'
+            if show_cost:
+                extra = ['{:23s}'.format(f'price={price} per {symbol}')]
+                if symbol in acct.purchased:
+                    cost = acct.costs[symbol]
+                    purchased = acct.purchased[symbol]
+                    avg_cost = Quantity(cost/purchased, '$')
+                    extra += ['{:27s}'.format(f'cost={avg_cost} for {purchased}')]
+                    if avg_cost:
+                        gain = (price - avg_cost)/avg_cost
+                        extra += [f'gain={gain:.0%}']
+                currency[value] = f"    {row:25s}  {' '.join(extra)}".rstrip()
+            else:
+                bar = render_bar(value/largest_share, 55)
+                amount = f'{tokens:>11q} = {value:<6q} @ {price}/{symbol}'
+                currency[value] = "    {:35s}  {:5.1%}  {}".format(amount, share, bar)
 
-    total = acct.total_value()
     cost = acct.total_cost()
     if cost:
         delta = Quantity(total-cost, '$')
