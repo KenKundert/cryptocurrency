@@ -1,8 +1,8 @@
 from quantiphy import Quantity, UnitConversion, UnknownConversion
 from inform import warn, comment, cull
 
-__version__ = '0.0.17'
-__released__ = '2019-04-17'
+__version__ = '0.1.0'
+__released__ = '2019-07-12'
 
 
 class Currency:
