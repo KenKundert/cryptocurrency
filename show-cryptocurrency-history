@@ -11,6 +11,8 @@ options:
     -q, --quarter    only show the most recent quarter
     -m, --month      only show the most recent month
     -n, --normalize  show normalized to latest value
+    -t <tokens>, --tokens <tokens>
+                     only show these tokens (comma separated list)
 
 Where <request> is one of market_cap, volume, open, close, high, low, holdings.
 If not given, the market cap is shown.
@@ -160,7 +162,7 @@ class Currency:
         trace, = axis.plot_date(
             dates, values, color=cls.COLOR, linestyle='-', marker=None
         )
-        trace.set_label(f'{cls.SYMBOL} ({most_recent:#.2p})')
+        trace.set_label(f'{cls.SYMBOL} ({most_recent:#,.2p})')
         axis.text(
             dates[-1], values[-1], cls.SYMBOL,
             verticalalignment='top', horizontalalignment='right',
@@ -175,7 +177,7 @@ class Bitcoin(Currency):
     SYMBOL = 'BTC'
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
-    HOLDINGS = 0
+    HOLDINGS = 22.4
 
 # Ethereum {{{2
 class Ethereum(Currency):
@@ -183,7 +185,7 @@ class Ethereum(Currency):
     SYMBOL = 'ETH'
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
-    HOLDINGS = 0
+    HOLDINGS = 311.1298
 
 # BitcoinCash {{{2
 class BitcoinCash(Currency):
@@ -191,7 +193,7 @@ class BitcoinCash(Currency):
     SYMBOL = 'BCH'
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
-    HOLDINGS = 0
+    HOLDINGS = 14.7
 
 # BitcoinGold {{{2
 class BitcoinGold(Currency):
@@ -199,7 +201,7 @@ class BitcoinGold(Currency):
     SYMBOL = 'BTG'
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
-    HOLDINGS = 0
+    HOLDINGS = 11.2
 
 # ZCash {{{2
 class ZCash(Currency):
@@ -207,7 +209,7 @@ class ZCash(Currency):
     SYMBOL = 'ZEC'
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
-    HOLDINGS = 0
+    HOLDINGS = 13.9
 
 # Cardano {{{2
 class Cardano(Currency):
@@ -215,7 +217,7 @@ class Cardano(Currency):
     SYMBOL = 'ADA'
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
-    HOLDINGS = 0
+    HOLDINGS = 8991
 
 # Stellar {{{2
 #class Stellar(Currency):
@@ -227,10 +229,10 @@ class Cardano(Currency):
 # Eos {{{2
 class Eos(Currency):
     CURRENCY = 'eos'
-    SYMBOL = 'ADA'
+    SYMBOL = 'EOS'
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
-    HOLDINGS = 0
+    HOLDINGS = 4082.8656
 
 # Iota {{{2
 class Iota(Currency):
@@ -238,7 +240,7 @@ class Iota(Currency):
     SYMBOL = 'IOT'
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
-    HOLDINGS = 0
+    HOLDINGS = 2503
 
 # Eos Black {{{2
 class EosBlack(Currency):
@@ -246,7 +248,7 @@ class EosBlack(Currency):
     SYMBOL = 'BLACK'
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
-    HOLDINGS = 0
+    HOLDINGS = 1982.7656
 
 # Bit Shares {{{2
 #class BitShares(Currency):
@@ -305,6 +307,13 @@ try:
         raise Error(
             'invalid request, choose from:', ', '.join(choices), culprit=choice
         )
+    tokens = cmdline['--tokens']
+    if not tokens:
+        tokens = 'BTC ETH EOS BCH ZEC'
+    else:
+        tokens = tokens.upper().split(',')
+    if 'ALL' in tokens:
+        tokens = True
 
     # get interval in months {{{2
     if cmdline['--year']:
@@ -328,13 +337,14 @@ try:
     figure = plt.figure()
     axis = figure.add_subplot(111)
     for currency in Currency.currencies():
-        if not currency.read_data():
-            currency.download_data()
-            currency.write_data()
-        try:
-            currency.add_trace(axis, choice, bounds, normalize)
-        except IndexError:
-            error('not available.', culprit=currency.CURRENCY)
+        if tokens is True or currency.SYMBOL in tokens:
+            if not currency.read_data():
+                currency.download_data()
+                currency.write_data()
+            try:
+                currency.add_trace(axis, choice, bounds, normalize)
+            except IndexError:
+                error('not available.', culprit=currency.CURRENCY)
     if bounds.ymax != bounds.ymin:
         bounds.apply(axis)
         axis.set_yscale('log')

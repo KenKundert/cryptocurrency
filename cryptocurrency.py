@@ -40,7 +40,10 @@ class Currency:
         for s in cls.__subclasses__():
             yield s.__name__
 
-    units = names
+    @classmethod
+    def units(cls):
+        for s in cls.__subclasses__():
+            yield s.UNITS
 
     @classmethod
     def currencies(cls):
@@ -96,7 +99,7 @@ class ZEC(Currency):
     one = Quantity(1, UNITS)
 
 class IOT(Currency):
-    UNITS = 'IOT'
+    UNITS = 'MIOTA'
     NAME = 'IOTA'
     SYMBOL = 'ι'
     one = Quantity(1, UNITS)

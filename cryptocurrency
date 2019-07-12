@@ -7,11 +7,14 @@ usage:
     cryptocurrency [options] [<accounts>...]
 
 options:
-    -C <dir>, --config-dir  <dir>    directory that holds transactions file
+    -C <dir>, --config-dir <dir>     directory that holds transactions file
     -c, --cost                       show cost
-    -p, --prices                     show prices rather than portfolio
+    -p <tokens>, --prices <tokens>   show prices rather than portfolio;
+                                     <tokens> is a comma separated list of token
+                                     names, or all to show all known tokens.
     -T, --transactions               show transactions with portfolio
     -t, --tokens                     show number of tokens held
+    -f, --fixed                      show dollar amounts in dollars and cents
     -i, --insecure                   do not check certificate of prices website
     -P, --proxy                      connect to the internet through a proxy
 
@@ -25,7 +28,8 @@ the currency and value is its value in US dollars.  For example:
 
 import requests
 from inform import (
-    Color, cull, display, done, error, fatal, join, os_error, warn, render_bar
+    Color, cull, display, done, error, fatal, is_str, join, os_error,
+    render_bar, warn,
 )
 from textwrap import dedent
 from quantiphy import Quantity, UnitConversion, UnknownConversion
@@ -37,8 +41,13 @@ import arrow
 
 TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
 Quantity.set_prefs(prec=2, map_sf=Quantity.map_sf_to_greek)
-credit = Color('green')
-debit = Color('red')
+credit_color = Color('green', Color.isTTY())
+debit_color = Color('red', Color.isTTY())
+num_toks_color = Color('cyan', Color.isTTY())
+total_color = Color('magenta', Color.isTTY())
+price_color = Color('green', Color.isTTY())
+share_color = Color('yellow', Color.isTTY())
+bar_color = Color('blue', Color.isTTY())
 proxies = dict(
     # The local socks5 proxy on port 9997.
     # Use this at TI because they block access to cryptocompare.
@@ -46,6 +55,10 @@ proxies = dict(
     https='socks5://localhost:9997',
 )
 reference_currencies = 'BTC EOS ETH USD'.split()
+min_value = 0.001
+
+class Dollar(Quantity):
+    units = '$'
 
 # read the command line
 cmdline = docopt(__doc__)
@@ -60,6 +73,10 @@ if insecure:
 use_proxy = cmdline['--proxy']
 if not use_proxy:
     proxies = None
+if cmdline['--fixed']:
+    Dollar.set_prefs(form='fixed', show_commas=True, strip_zeros=False)
+else:
+    Dollar.set_prefs(form='si')
 
 # find the transactions file
 if not show_prices:
@@ -119,11 +136,16 @@ now = arrow.now().format('h:mm A, dddd MMMM D')
 
 if show_prices:
     display(f'Prices as of {now}:')
+    if is_str(show_prices):
+        show_prices = show_prices.upper().split(',')
+        if 'ALL' in show_prices:
+            show_prices = True
     for c in Currency.currencies():
-        try:
-            display(f'    {c.one:<7s} = {c.one:<7q$} {c.one:<7qɃ} {c.one:<7qΞ} {c.one:qȄ}')
-        except UnknownConversion:
-            pass
+        if show_prices is True or c.UNITS in show_prices:
+            try:
+                display(f'    {c.one:<7s} = {c.one:<7q$} {c.one:<7qɃ} {c.one:<7qΞ} {c.one:qȄ}')
+            except UnknownConversion:
+                pass
     done()
 
 # read the transactions
@@ -147,7 +169,7 @@ for override in overrides:
         n, v = override.split('=')
         c = Currency.currency(n)
         was = f'rather than {c.one:q$}' if c else '(not found)'
-        v = Quantity(v, '$')
+        v = Dollar(v)
         UnitConversion(('USD', v.units), n, slope=v)
         display(f'Override: {n} = {v:q$} {was}.')
     except ValueError:
@@ -171,16 +193,16 @@ for name in desired_accounts:
             if value[0] == '-':
                 value = value[1:]
                 ttype = 'debit'
-                color = debit
+                color = debit_color
             else:
                 ttype = 'credit'
-                color = credit
+                color = credit_color
             cost = t.cost if t.cost else t.tokens.in_dollars()
             cost = f'({cost})' if cost else None
             comment = f'-- {t.comment}' if t.comment else None
             prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
             display(color(*cull([prefix, value, cost, comment])))
-
+        display()
 
     if show_tokens:
         display(f"{name.title()}'s tokens as of {now}:")
@@ -189,57 +211,70 @@ for name in desired_accounts:
         display()
 
     title = f"{name.title()}'s holdings as of {now}:"
-    currency = {}
-    total = acct.total_value()
+    coins = {}
+    total = Dollar(acct.total_value())
     largest_share = acct.largest_share()
-    for symbol in Currency.names():
-        if symbol in acct.totals:
-            tokens = acct.totals[symbol]
+    for currency in Currency.currencies():
+        name = currency.__name__
+        symbol = currency.UNITS
+        if name in acct.totals:
+            tokens = acct.totals[name]
             try:
-                value = tokens.scale('$')
+                value = tokens.scale('$', cls=Dollar)
+                if value < min_value*total:
+                    continue
             except UnknownConversion as e:
                 warn(e)
                 continue
             tokens = tokens.scale(symbol)
             share = value / total
-            price = Quantity(1, symbol).scale('$')
-            row = f'{tokens:>11q} = {value:<7q} {share:.0%}'
+            price = Quantity(1, symbol).scale('$', cls=Dollar)
+            t = num_toks_color(f'{tokens:>11q}')
+            v = total_color(f'{value:<6}')
+            p = f'{price}/{symbol}'
+            p = price_color(f'{p:<13}')
+            s = share_color(f'{share:5.1%}')
             if show_cost:
-                extra = ['{:23s}'.format(f'price={price} per {symbol}')]
-                if symbol in acct.purchased:
-                    cost = acct.costs[symbol]
-                    purchased = acct.purchased[symbol]
-                    avg_cost = Quantity(cost/purchased, '$')
-                    extra += ['{:27s}'.format(f'cost={avg_cost} for {purchased}')]
+                if name in acct.purchased:
+                    cost = acct.costs[name]
+                    purchased = acct.purchased[name]
+                    avg_cost = Dollar(cost/purchased)
+                    extra = '{:32s}'.format(f'cost={avg_cost} each for {purchased}')
                     if avg_cost:
                         gain = (price - avg_cost)/avg_cost
-                        extra += [f'gain={gain:.0%}']
-                currency[value] = f"    {row:25s}  {' '.join(extra)}".rstrip()
+                        extra += f' gain={gain:.0%}'
+                else:
+                    extra = ''
+                row = f"    {t} = {v} @ {p} {s}  {extra}"
             else:
                 bar = render_bar(value/largest_share, 55)
-                amount = f'{tokens:>11q} = {value:<6q} @ {price}/{symbol}'
-                currency[value] = "    {:35s}  {:5.1%}  {}".format(amount, share, bar)
+                row = f"    {t} = {v} @ {p} {s}  {bar_color(bar)}"
+            coins[value] = row.rstrip()
+        else:
+            if name != 'USD':
+                warn('missing:', name)
 
-    cost = acct.total_cost()
+    cost = Dollar(acct.total_cost())
     if cost:
-        delta = Quantity(total-cost, '$')
+        delta = Dollar(total-cost)
         gain = (total-cost)/cost
-        combined = f'        Total = {total:<13}  {gain:.0%} ({delta}) gain on {cost} investment'
+        combined = f'          Total = {total:<7}  {gain:.0%} ({delta}) gain on {cost} investment'
     else:
-        combined = f'        Total = {total}'
+        combined = f'          Total = {total}'
     summary = (
         [title] +
-        [currency[v] for v in sorted(currency, reverse=True)] +
+        [coins[v] for v in sorted(coins, reverse=True)] +
         [combined]
     )
     holdings.append(join(*summary, sep='\n'))
 
 display(*holdings, sep='\n\n')
 
-#try:
-#    from networth import total as non_crypto_total
-#    networth = Quantity(total + non_crypto_total, '$')
-#    percentage = total / networth
-#    display(f'    Net Worth = {networth}  {percentage:.1%}')
-#except ImportError:
-#    pass
+# try:
+#     from networth import total as non_crypto_total
+#     networth = Dollar(total + non_crypto_total)
+#     fraction = total / networth
+#     display(f'    Net Worth = {networth}  {fraction:.1%}')
+# except ImportError:
+#     error('Could not access networth.')
+#     pass
