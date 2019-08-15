@@ -7,6 +7,7 @@ usage:
     cryptocurrency [options] [<accounts>...]
 
 options:
+    -a, --all                        show all tokens
     -C <dir>, --config-dir <dir>     directory that holds transactions file
     -c, --cost                       show cost
     -p <tokens>, --prices <tokens>   show prices rather than portfolio;
@@ -67,6 +68,9 @@ show_transactions = cmdline['--transactions']
 show_tokens = cmdline['--tokens']
 show_prices =  cmdline['--prices']
 show_cost =  cmdline['--cost']
+show_all = cmdline['--all']
+if show_all:
+    min_value = 0
 insecure = cmdline['--insecure']
 if insecure:
     requests.packages.urllib3.disable_warnings()
@@ -221,7 +225,7 @@ for name in desired_accounts:
             tokens = acct.totals[name]
             try:
                 value = tokens.scale('$', cls=Dollar)
-                if value < min_value*total:
+                if value <= min_value*total:
                     continue
             except UnknownConversion as e:
                 warn(e)

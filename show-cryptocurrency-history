@@ -41,7 +41,7 @@ import arrow
 import json
 import requests
 import re
-Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek)
+Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek, prec=2)
 
 # Currency class {{{1
 class Currency:
@@ -162,7 +162,8 @@ class Currency:
         trace, = axis.plot_date(
             dates, values, color=cls.COLOR, linestyle='-', marker=None
         )
-        trace.set_label(f'{cls.SYMBOL} ({most_recent:#,.2p})')
+        #trace.set_label(f'{cls.SYMBOL} ({most_recent:#,.2p})')
+        trace.set_label(f'{cls.SYMBOL} ({most_recent})')
         axis.text(
             dates[-1], values[-1], cls.SYMBOL,
             verticalalignment='top', horizontalalignment='right',
@@ -348,7 +349,8 @@ try:
     if bounds.ymax != bounds.ymin:
         bounds.apply(axis)
         axis.set_yscale('log')
-        formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
+        #formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
+        formatter = FuncFormatter(lambda v, p: Quantity(v, units))
         axis.yaxis.set_major_formatter(formatter)
         if bounds.ymax / bounds.ymin > 10:
             axis.yaxis.set_minor_formatter(NullFormatter())
