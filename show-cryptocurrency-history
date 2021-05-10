@@ -11,10 +11,11 @@ options:
     -q, --quarter    only show the most recent quarter
     -m, --month      only show the most recent month
     -n, --normalize  show normalized to latest value
+    -r, --regress    show trend
     -t <tokens>, --tokens <tokens>
                      only show these tokens (comma separated list)
 
-Where <request> is one of market_cap, volume, open, close, high, low, holdings.
+Where <request> is one of cap, volume, open, close, high, low, holdings.
 If not given, the market cap is shown.
 
 Holdings can be a bit misleading. It is the historical price multiplied by the 
@@ -29,62 +30,51 @@ current holdings.
 
 # Imports {{{1
 from pathlib import Path
-from inform import Error, display, done, error, os_error
+from inform import Inform, Error, display, done, error, narrate, os_error, render
 from quantiphy import Quantity
+Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek, prec=2)
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import FuncFormatter, NullFormatter
 from docopt import docopt
-from appdirs import user_cache_dir
+from appdirs import user_cache_dir, user_data_dir
 from shlib import mkdir
 import arrow
 import json
 import requests
 import re
-Quantity.set_prefs(map_sf=Quantity.map_sf_to_greek, prec=2)
+import json
+
+# stop matplotlib from issuing spurious warnings
+import warnings
+warnings.filterwarnings("ignore")
 
 # Currency class {{{1
 class Currency:
-    URL = "https://coinmarketcap.com/currencies/{currency}/historical-data/?start={start}&end={end}"
-    START_ROW = '<tr class="text-right">'
-    DATE_CELL = '<td class="text-left">(?P<{}>[^<]*)</td>'
-    VALUE_CELL = '<td data-format-fiat data-format-value="[^"]*">(?P<{}>[^<]*)</td>'
-    OTHER_CELL = '<td data-format-market-cap data-format-value="[^"]*">(?P<{}>[^<]*)</td>'
-    END_ROW = '</tr>'
-    REGEX = r'\s*'.join([
-        START_ROW,
-        DATE_CELL.format('date'),
-        VALUE_CELL.format('open'),
-        VALUE_CELL.format('high'),
-        VALUE_CELL.format('low'),
-        VALUE_CELL.format('close'),
-        OTHER_CELL.format('volume'),
-        OTHER_CELL.format('market_cap'),
-        END_ROW,
-    ])
-    MATCHER = re.compile(REGEX)
+    API_URL = 'https://min-api.cryptocompare.com/data/v2/histoday?fsym={sym}&tsym=USD&allData=true&api_key={api_key}'
+    api_key = 'e895762a03fb91c4c6118605c56c9096443c7648347e87b65eedc680c059e90b'
 
     # currencies() {{{2
     @staticmethod
     def currencies():
         for cls in sorted(Currency.__subclasses__(), key=lambda c: c.INCEPTION_DATE):
-            yield cls
+            if cls.SHOW:
+                yield cls
 
     # download_data() {{{2
     @classmethod
     def download_data(cls):
+        # this version downloads a json version of the data, it should be robust
         display('updating', cls.CURRENCY)
-        now = arrow.now().format('YYYYMMDD')
-        url = cls.URL.format(
-            currency=cls.CURRENCY, start=cls.INCEPTION_DATE, end=now
-        )
+        now = arrow.now().format('YYYY-MM-DD')
+        url = cls.API_URL.format( sym=cls.SYMBOL, api_key=cls.api_key)
+        narrate(f'Accessing {cls.CURRENCY} using {url}')
         try:
             r = requests.get(url)
-            html = r.text
-            cls.data = []
+            data = r.json()
+            cls.data = data['Data']['Data']
             cls.today = now
-            for match in cls.MATCHER.finditer(html):
-                cls.data.append(match.groupdict())
             return
         except requests.exceptions.TooManyRedirects as e:
             reason = 'too many redirects.'
@@ -98,7 +88,7 @@ class Currency:
                 reason = 'certificate error, consider using --insecure option.'
             else:
                 reason = 'connection error.'
-            raise Error(reason, codicil=str(e), culprit=url)
+        raise Error(reason, codicil=str(e), culprit=url)
 
     # write_data() {{{2
     @classmethod
@@ -121,11 +111,12 @@ class Currency:
             in_file = Path(cache_dir, cls.CURRENCY + '.json')
             if not in_file.exists():
                 return False
+            narrate(f'reading cache: {in_file!s}')
             loaded_text = in_file.read_text()
             loaded_data = json.loads(loaded_text)
             cls.today = loaded_data['date']
             cls.data = loaded_data['data']
-            now = arrow.now().format('YYYYMMDD')
+            now = arrow.now().format('YYYY-MM-DD')
             return cls.today == now
         except OSError as e:
             raise Error(os_error(e))
@@ -134,24 +125,29 @@ class Currency:
 
     # add_trace() {{{2
     @classmethod
-    def add_trace(cls, axis, choice, bounds, normalize):
+    def add_trace(cls, axis, choice, bounds, normalize, regress):
         # process the data
         dates = []
         values = []
         if choice == 'holdings':
             scale = cls.HOLDINGS
+            if not scale:
+                error('no holdings.', cls.SYMBOL)
+                return
             choice = 'close'
         else:
             scale = 1
 
-        most_recent = Quantity(cls.data[0][choice].replace(',', ''), '$')
+        most_recent = Quantity(cls.data[-1][choice], '$')
         if normalize:
             scale = 1/most_recent
 
         for data in cls.data:
             try:
-                v = scale*float(data[choice].replace(',', ''))
-                d = arrow.get(data['date'], 'MMM DD, YYYY')
+                v = scale*float(data[choice])
+                d = arrow.get(data['time'])
+                if not v:
+                    continue
                 if not bounds.update(d, v):
                     continue
                 values.append(v)
@@ -170,6 +166,23 @@ class Currency:
             color=cls.COLOR, fontsize=12
         )
 
+        if regress:
+            (ar, br) = np.polyfit(
+                [d.toordinal() for d in dates],
+                np.log(values),
+                1
+            )
+            interval = [dates[0], dates[-1]]
+            r_values = np.exp(
+                np.polyval([ar, br], [d.toordinal() for d in interval])
+            )
+            growth = Quantity(100*np.exp(366*ar), '%/year')  # 366 days per year
+            years = Quantity((dates[-1] - dates[0]).days/366, 'years')
+            print(f'{cls.SYMBOL} growth = {growth} over last {years}')
+            trace, = axis.plot_date(
+                interval, r_values, color=cls.COLOR, linestyle='-.', marker=None
+            )
+
 
 # Currency classes {{{1
 # Bitcoin {{{2
@@ -179,6 +192,7 @@ class Bitcoin(Currency):
     INCEPTION_DATE = '20130428'
     COLOR = 'blue'
     HOLDINGS = 0
+    SHOW = True
 
 # Ethereum {{{2
 class Ethereum(Currency):
@@ -187,6 +201,7 @@ class Ethereum(Currency):
     INCEPTION_DATE = '20150807'
     COLOR = 'green'
     HOLDINGS = 0
+    SHOW = True
 
 # BitcoinCash {{{2
 class BitcoinCash(Currency):
@@ -195,6 +210,7 @@ class BitcoinCash(Currency):
     INCEPTION_DATE = '20170723'
     COLOR = 'red'
     HOLDINGS = 0
+    SHOW = True
 
 # BitcoinGold {{{2
 class BitcoinGold(Currency):
@@ -203,6 +219,7 @@ class BitcoinGold(Currency):
     INCEPTION_DATE = '20171023'
     COLOR = 'gold'
     HOLDINGS = 0
+    SHOW = False
 
 # ZCash {{{2
 class ZCash(Currency):
@@ -211,6 +228,7 @@ class ZCash(Currency):
     INCEPTION_DATE = '20161029'
     COLOR = 'magenta'
     HOLDINGS = 0
+    SHOW = True
 
 # Cardano {{{2
 class Cardano(Currency):
@@ -219,13 +237,15 @@ class Cardano(Currency):
     INCEPTION_DATE = '20171001'
     COLOR = 'cyan'
     HOLDINGS = 0
+    SHOW = True
 
 # Stellar {{{2
-#class Stellar(Currency):
-#    CURRENCY = 'stellar'
-#    SYMBOL = 'XLM'
-#    INCEPTION_DATE = '20140805'
-#    COLOR = 'brown'
+class Stellar(Currency):
+    CURRENCY = 'stellar'
+    SYMBOL = 'XLM'
+    INCEPTION_DATE = '20140805'
+    COLOR = 'brown'
+    SHOW = True
 
 # Eos {{{2
 class Eos(Currency):
@@ -234,6 +254,7 @@ class Eos(Currency):
     INCEPTION_DATE = '20170701'
     COLOR = 'gray'
     HOLDINGS = 0
+    SHOW = True
 
 # Iota {{{2
 class Iota(Currency):
@@ -242,6 +263,7 @@ class Iota(Currency):
     INCEPTION_DATE = '20170613'
     COLOR = 'orange'
     HOLDINGS = 0
+    SHOW = True
 
 # Eos Black {{{2
 class EosBlack(Currency):
@@ -250,20 +272,23 @@ class EosBlack(Currency):
     INCEPTION_DATE = '20180907'
     COLOR = 'black'
     HOLDINGS = 0
+    SHOW = False
 
 # Bit Shares {{{2
-#class BitShares(Currency):
-#    CURRENCY = 'bitshares'
-#    SYMBOL = 'BTS'
-#    INCEPTION_DATE = '20140721'
-#    COLOR = 'magenta'
+class BitShares(Currency):
+    CURRENCY = 'bitshares'
+    SYMBOL = 'BTS'
+    INCEPTION_DATE = '20140721'
+    COLOR = 'magenta'
+    SHOW = False
 
 # Neo {{{2
-#class Neo(Currency):
-#    CURRENCY = 'neo'
-#    SYMBOL = 'NEO'
-#    INCEPTION_DATE = '20160909'
-#    COLOR = 'pink'
+class Neo(Currency):
+    CURRENCY = 'neo'
+    SYMBOL = 'NEO'
+    INCEPTION_DATE = '20160909'
+    COLOR = 'pink'
+    SHOW = False
 
 # Bounds class {{{1
 class Bounds:
@@ -286,7 +311,7 @@ class Bounds:
             return False
         if d < self.xmin:
             self.xmin = d
-        if v < self.ymin:
+        if v and v < self.ymin:
             self.ymin = v
         if v > self.ymax:
             self.ymax = v
@@ -297,69 +322,73 @@ class Bounds:
         axis.set_ylim(0.9*self.ymin, 1.1*self.ymax)
 
 # main {{{1
-try:
-    # get choice on what to show {{{2
-    cmdline = docopt(__doc__)
-    choice = cmdline['<request>']
-    if not choice:
-        choice = 'holdings'
-    choices = 'open high low close volume market_cap holdings'.split()
-    if choice not in choices:
-        raise Error(
-            'invalid request, choose from:', ', '.join(choices), culprit=choice
-        )
-    tokens = cmdline['--tokens']
-    if not tokens:
-        tokens = 'BTC ETH EOS BCH ZEC'
-    else:
-        tokens = tokens.upper().split(',')
-    if 'ALL' in tokens:
-        tokens = True
+with Inform(logfile=f'{user_data_dir()}/cryptocurrency/show-cryptocurrency-history.log'):
+    try:
+        # get choice on what to show {{{2
+        cmdline = docopt(__doc__)
+        choice = cmdline['<request>']
+        if not choice:
+            choice = 'holdings'
+            choice = 'close'
+        choices = 'open high low close volume cap holdings'.split()
+        if choice not in choices:
+            raise Error(
+                'invalid request, choose from:', ', '.join(choices), culprit=choice
+            )
+        tokens = cmdline['--tokens']
+        if not tokens:
+            tokens = 'BTC ETH EOS BCH ZEC'
+        tokens = sorted(set(tokens.upper().replace(',', ' ').split()))
+        if 'ALL' in tokens:
+            tokens = True
 
-    # get interval in months {{{2
-    if cmdline['--year']:
-        interval = 12
-    elif cmdline['--quarter']:
-        interval = 3
-    elif cmdline['--month']:
-        interval = 1
-    else:
-        interval = 0
-
-    # process normalize option {{{2
-    normalize = cmdline['--normalize']
-    if choice == 'holdings' and normalize:
-        display('Showing normalized prices at close.')
-        choice = 'close'
-    units = '' if choice == 'volume' or normalize else '$'
-
-    # generate the graph {{{2
-    bounds = Bounds(cmdline)
-    figure = plt.figure()
-    axis = figure.add_subplot(111)
-    for currency in Currency.currencies():
-        if tokens is True or currency.SYMBOL in tokens:
-            if not currency.read_data():
-                currency.download_data()
-                currency.write_data()
-            try:
-                currency.add_trace(axis, choice, bounds, normalize)
-            except IndexError:
-                error('not available.', culprit=currency.CURRENCY)
-    if bounds.ymax != bounds.ymin:
-        bounds.apply(axis)
-        axis.set_yscale('log')
-        #formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
-        formatter = FuncFormatter(lambda v, p: Quantity(v, units))
-        axis.yaxis.set_major_formatter(formatter)
-        if bounds.ymax / bounds.ymin > 10:
-            axis.yaxis.set_minor_formatter(NullFormatter())
+        # get interval in months {{{2
+        if cmdline['--year']:
+            interval = 12
+        elif cmdline['--quarter']:
+            interval = 3
+        elif cmdline['--month']:
+            interval = 1
         else:
-            axis.yaxis.set_minor_formatter(formatter)
-    axis.legend()
-    axis.set_title(choice.replace('_', ' '))
-    plt.show()
-except Error as e:
-    e.report()
-except KeyboardInterrupt:
+            interval = 0
+
+        # process normalize option {{{2
+        normalize = cmdline['--normalize']
+        if choice == 'holdings' and normalize:
+            display('Showing normalized prices at close.')
+            choice = 'close'
+        units = '' if choice == 'volume' or normalize else '$'
+
+        # generate the graph {{{2
+        bounds = Bounds(cmdline)
+        figure = plt.figure()
+        axis = figure.add_subplot(111)
+        for currency in Currency.currencies():
+            if tokens is True or currency.SYMBOL in tokens:
+                if not currency.read_data():
+                    currency.download_data()
+                    currency.write_data()
+                try:
+                    currency.add_trace(
+                        axis, choice, bounds, normalize, cmdline['--regress']
+                    )
+                except IndexError:
+                    error('not available.', culprit=currency.CURRENCY)
+        if bounds.ymax != bounds.ymin:
+            bounds.apply(axis)
+            axis.set_yscale('log')
+            #formatter = FuncFormatter(lambda v, p: Quantity(v, units).fixed(show_commas=True))
+            formatter = FuncFormatter(lambda v, p: Quantity(v, units))
+            axis.yaxis.set_major_formatter(formatter)
+            if bounds.ymax / bounds.ymin > 10:
+                axis.yaxis.set_minor_formatter(NullFormatter())
+            else:
+                axis.yaxis.set_minor_formatter(formatter)
+        axis.legend()
+        axis.set_title(choice.replace('_', ' '))
+        plt.show()
+    except Error as e:
+        e.report()
+    except KeyboardInterrupt:
+        pass
     done()

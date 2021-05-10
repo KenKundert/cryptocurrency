@@ -18,6 +18,9 @@ options:
     -f, --fixed                      show dollar amounts in dollars and cents
     -i, --insecure                   do not check certificate of prices website
     -P, --proxy                      connect to the internet through a proxy
+    -C <filename>, --csv <filename>  generate csv file of transactions
+    --start <start-date>             ignore transactions before this date, YYMMDD
+    --stop <stop-date>               ignore transactions after this date, YYMMDD
 
 You can also override the current price of cryptocurrencies to examine what-if 
 scenarios.  Any account specified that contains an '=' is taken to be an 
@@ -29,7 +32,7 @@ the currency and value is its value in US dollars.  For example:
 
 import requests
 from inform import (
-    Color, cull, display, done, error, fatal, is_str, join, os_error,
+    Error, Color, cull, display, done, error, fatal, is_str, join, os_error,
     render_bar, warn,
 )
 from textwrap import dedent
@@ -50,13 +53,13 @@ price_color = Color('green', Color.isTTY())
 share_color = Color('yellow', Color.isTTY())
 bar_color = Color('blue', Color.isTTY())
 proxies = dict(
-    # The local socks5 proxy on port 9997.
-    # Use this at TI because they block access to cryptocompare.
-    http='socks5://localhost:9997',
-    https='socks5://localhost:9997',
+    # The local socks5 proxy on port 9998.
+    # Use this at companies that block access to cryptocompare.
+    http='socks5://localhost:9998',
+    https='socks5://localhost:9998',
 )
 reference_currencies = 'BTC EOS ETH USD'.split()
-min_value = 0.001
+min_value = 0.001  # relative to total
 
 class Dollar(Quantity):
     units = '$'
@@ -69,6 +72,10 @@ show_tokens = cmdline['--tokens']
 show_prices =  cmdline['--prices']
 show_cost =  cmdline['--cost']
 show_all = cmdline['--all']
+start_date = cmdline['--start']
+stop_date = cmdline['--stop']
+ignore_before = arrow.get(start_date if start_date else '090103', 'YYMMDD')
+ignore_after = arrow.get(stop_date, 'YYMMDD') if stop_date else arrow.now()
 if show_all:
     min_value = 0
 insecure = cmdline['--insecure']
@@ -78,7 +85,8 @@ use_proxy = cmdline['--proxy']
 if not use_proxy:
     proxies = None
 if cmdline['--fixed']:
-    Dollar.set_prefs(form='fixed', show_commas=True, strip_zeros=False)
+    Dollar.set_prefs(form='fixed', show_commas=True, strip_zeros=False, prec=2)
+    Quantity.set_prefs(form='fixed', show_commas=True, strip_zeros=True, prec=8)
 else:
     Dollar.set_prefs(form='si')
 
@@ -155,11 +163,11 @@ if show_prices:
 # read the transactions
 try:
     transactions = PythonFile(transactions_filepath)
+    transactions.initialize()
+    transactions.run()
+    # running the transactions file causes accounts to be set as a side effect
 except Error as e:
     e.terminate()
-transactions.initialize()
-transactions.run()
-    # running the transactions file causes accounts to be set as a side effect
 
 # process the specified accounts, some of which may actually be overrides
 overrides = [n for n in desired_accounts if '=' in n]
@@ -176,7 +184,7 @@ for override in overrides:
         v = Dollar(v)
         UnitConversion(('USD', v.units), n, slope=v)
         display(f'Override: {n} = {v:q$} {was}.')
-    except ValueError:
+    except (KeyError, ValueError):
         fatal('garbled override, expected name=value.', culprit=override)
 if overrides:
     display()
@@ -188,24 +196,80 @@ for name in desired_accounts:
     except KeyError:
         error('unknown account.', culprit=name)
         continue
+
+    if cmdline['--csv']:
+        acct.gen_csv(cmdline['--csv'])
+
     if show_transactions:
+        # first compute cost basis for all transactions
+        for t in acct.transactions.values():
+            try:
+                t.compute_cost_basis()
+            except Error as e:
+                e.terminate()
+
         display()
         display(f"{name.title()}'s Transactions:")
-        for t in acct.transactions:
+        unreported = {}
+        costs = {}
+        for t in acct.transactions.values():
+            try:
+                date = arrow.get(t.date[:6], 'YYMMDD')
+            except TypeError:
+                continue
+            if date < ignore_before or date > ignore_after:
+                continue
             price = t.tokens.price
             value = f'{t.tokens} @ {price}' if price else str(t.tokens)
             if value[0] == '-':
                 value = value[1:]
-                ttype = 'debit'
+                ttype = 'sale'
                 color = debit_color
             else:
-                ttype = 'credit'
+                ttype = 'purchase'
                 color = credit_color
-            cost = t.cost if t.cost else t.tokens.in_dollars()
+            cost = t.proceeds if t.proceeds else t.tokens.in_dollars()
             cost = f'({cost})' if cost else None
             comment = f'-- {t.comment}' if t.comment else None
             prefix = '    ' + ' '.join(cull([t.date, ttype])) + ':'
             display(color(*cull([prefix, value, cost, comment])))
+            #if True or t.tokens_reported:
+            #    display(
+            #        '       ',
+            #        f'reported={t.reported()}, remaining={t.remaining()}'
+            #    )
+            #    if ttype == 'debit':
+            #        warn('tokens reported on debit.', culprit=t)
+            #    elif t.tokens.price == 0:
+            #        warn('tokens reported on credit with no price.', culprit=t)
+            if t.tokens.in_tokens() >= 0:
+                remaining = t.tokens_remaining()
+                cost = getattr(t, 'cost_basis', None)
+                if remaining > 0.001:
+                    display(
+                        remaining, cost,
+                        template = (
+                            '        still unreported = {} (cost = {}).',
+                            '        still unreported = {}.',
+                        ),
+                        remove = None
+                    )
+                    unreported[remaining.units] = remaining.add(unreported.get(remaining.units, 0))
+                    if cost:
+                        costs[remaining.units] = cost.add(costs.get(remaining.units, 0))
+            if hasattr(t, 'profit'):
+                display(
+                    f'        proceeds = {t.proceeds.fixed(scale=-1)}',
+                    f'cost basis = {t.cost_basis}',
+                    f'profit = {t.profit}',
+                    sep=', '
+                )
+        display()
+        display('Unreported:')
+        for k in sorted(unreported):
+            display(k, unreported[k], costs.get(k), template=(
+                '    {:<5} : {:p} {:#,.2p}', '    {:<5} : {:p}',
+            ), remove=None)
         display()
 
     if show_tokens:
@@ -251,18 +315,19 @@ for name in desired_accounts:
                     extra = ''
                 row = f"    {t} = {v} @ {p} {s}  {extra}"
             else:
-                bar = render_bar(value/largest_share, 55)
+                bar = render_bar(value/largest_share, 45)
                 row = f"    {t} = {v} @ {p} {s}  {bar_color(bar)}"
             coins[value] = row.rstrip()
         else:
             if name != 'USD':
-                warn('missing:', name)
+                #warn('missing:', name)
+                pass
 
     cost = Dollar(acct.total_cost())
     if cost:
         delta = Dollar(total-cost)
         gain = (total-cost)/cost
-        combined = f'          Total = {total:<7}  {gain:.0%} ({delta}) gain on {cost} investment'
+        combined = f'          Total = {total:<7}  {delta} ({gain:.0%}) gain on {cost} investment'
     else:
         combined = f'          Total = {total}'
     summary = (
