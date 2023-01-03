@@ -45,13 +45,13 @@ import arrow
 
 TRANSACTIONS_FILENAMES = 'transactions.gpg transactions'
 Quantity.set_prefs(prec=2, map_sf=Quantity.map_sf_to_greek)
-credit_color = Color('green', Color.isTTY())
-debit_color = Color('red', Color.isTTY())
-num_toks_color = Color('cyan', Color.isTTY())
-total_color = Color('magenta', Color.isTTY())
-price_color = Color('green', Color.isTTY())
-share_color = Color('yellow', Color.isTTY())
-bar_color = Color('blue', Color.isTTY())
+credit_color = Color('green', enable=Color.isTTY())
+debit_color = Color('red', enable=Color.isTTY())
+num_toks_color = Color('cyan', enable=Color.isTTY())
+total_color = Color('magenta', enable=Color.isTTY())
+price_color = Color('green', enable=Color.isTTY())
+share_color = Color('yellow', enable=Color.isTTY())
+bar_color = Color('blue', enable=Color.isTTY())
 proxies = dict(
     # The local socks5 proxy on port 9998.
     # Use this at companies that block access to cryptocompare.
