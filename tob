@@ -1,0 +1,60 @@
+#!/usr/bin/python3
+"""
+Convert to bitcoin.
+
+Usage:
+    tob <amount>
+
+Can convert from dollars (no suffix), satoshis (s suffix), or bitcoin (b 
+suffix).
+"""
+
+from inform import display, fatal, os_error, warn
+import nestedtext as nt
+from quantiphy import Quantity, UnitConversion, QuantiPhyError
+from pathlib import Path
+import arrow
+from docopt import docopt
+
+class Dollars(Quantity):
+    units = '$'
+    form = 'fixed'
+    prec = 2
+    strip_zeros = False
+    show_commas = True
+
+Quantity.set_prefs(known_units='b s e')
+
+unit_mappings = {
+    # key is unit used in prices, first unit in value is default unit
+    'sat': 's ș',
+    'BTC': 'btc b Ƀ',
+}
+unit_mappings = {k:[k]+v.split() for k, v in unit_mappings.items()}
+
+cmdline = docopt(__doc__)
+amount = cmdline['<amount>']
+try:
+    prices_path = Path('~/.cache/cryptocurrency/prices.nt').expanduser()
+    prices = nt.load(prices_path, top=dict)
+    updated = arrow.get(prices.pop('updated'))
+    now = arrow.now()
+    age = now - updated
+    if age.total_seconds() > 10*60:
+        warn(f'Prices updated {updated.humanize()}.')
+
+    for k, v in prices.items():
+        rate = Quantity(v)
+        UnitConversion(rate.units, unit_mappings[k], rate)
+        if k == 'BTC':
+            UnitConversion(rate.units, unit_mappings['sat'], rate/1e8)
+
+    amount = Quantity(amount, '$')
+    converted = amount.scale('BTC')
+    #display(amount, '→', converted)
+    display(converted)
+
+except nt.NestedTextError as e:
+    e.terminate()
+except QuantiPhyError as e:
+    fatal(e)
