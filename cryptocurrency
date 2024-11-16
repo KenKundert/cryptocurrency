@@ -183,7 +183,7 @@ for override in overrides:
         c = Currency.currency(n)
         was = f'rather than {c.one:q$}' if c else '(not found)'
         v = Dollar(v)
-        UnitConversion(('USD', v.units), n, slope=v)
+        UnitConversion(['USD', v.units], n, slope=v)
         display(f'Override: {n} = {v:q$} {was}.')
     except (KeyError, ValueError):
         fatal('garbled override, expected name=value.', culprit=override)
